@@ -760,8 +760,16 @@
                             // MUST live here: normalizeSave() only copies keys present in
                             // defaultData(), so a field absent from this object is silently
                             // dropped on load (this has bitten tutorialDone before — see V2 notes).
-      hype: 0,
+      // V22c (owner item 1): a career opens on Data.hypeStart, not 0. Hype
+      // became a tournament-driven stat, and tournaments need a team, and
+      // teams want hype — starting at 0 locked the first door from the inside.
+      hype: (Data().hypeStart != null) ? Data().hypeStart : 25,
       chemistry: 0,
+      // V22c (owner item 4): epoch ms of the last solo PLAY match, for the
+      // anti-farm cooldown. MUST live here — normalizeSave() only copies keys
+      // present in defaultData(), so a field missing from this object is
+      // silently dropped on load (HANDOFF-V2 §5.1).
+      lastMatchAt: 0,
       form: null,
       contract: 'free',
       scrimsToday: 0,
@@ -2777,6 +2785,57 @@
     };
   };
 
+  /* ---- CALMING SYRUP (V22c, owner item 5) ---------------------------------
+     The energy drink's mirror: it DRAINS 60% of maximum energy so the player
+     can sleep on demand. Deliberately built on the same three pieces the can
+     uses — a `requiresFridge` catalog entry, a do-it action and a read-only
+     status for the UI — rather than a parallel system, so the storage rule,
+     the shop gate and the hub button all keep exactly one implementation.
+
+     No daily limit, unlike the can: the can's limit exists to stop energy
+     being conjured from nothing, and this spends energy rather than creating
+     it. The real cost is the $100 and the fridge slot. -------------------- */
+  State.drinkCalmingSyrup = function () {
+    var d = State.data;
+    if (d.dead) return { ok: false, reason: 'dead' };
+    var def = findShopItem('calming_syrup');
+    var owned = d.owned.calming_syrup || 0;
+    if (owned <= 0) return { ok: false, reason: 'none-owned' };
+    if (d.energy <= 0) return { ok: false, reason: 'no-energy' };
+    var pct = (def && def.drainEnergyPct) || 0.60;
+    d.owned.calming_syrup = owned - 1;
+    // 60% of the MAXIMUM, not of what is left — a fixed, predictable bite, so
+    // the button does the same thing at 100 energy as at 70.
+    d.energy = clamp(d.energy - d.energyMax * pct, 0, d.energyMax);
+    commit();
+    return { ok: true, energy: d.energy, owned: d.owned.calming_syrup, drained: d.energyMax * pct };
+  };
+
+  State.calmingSyrupStatus = function () {
+    var d = State.data;
+    var def = findShopItem('calming_syrup');
+    var owned = d.owned.calming_syrup || 0;
+    var pct = (def && def.drainEnergyPct) || 0.60;
+    var reason = null;
+    if (owned <= 0) reason = 'none-owned';
+    else if (d.energy <= 0) reason = 'no-energy';
+    return {
+      owned: owned, drainPct: pct, drainAmount: Math.round(d.energyMax * pct),
+      canDrink: reason === null, reason: reason
+    };
+  };
+
+  /* State.matchCooldownRemaining() (V22c item 4) — ms left before PLAY is
+     available again, 0 when ready. Read-only; js/main.js shows it and
+     State.playMatch() enforces it, so the number has one source. */
+  State.matchCooldownRemaining = function () {
+    var d = State.data;
+    var span = Data().matchCooldownMs || 0;
+    if (!span) return 0;
+    var since = Date.now() - (d.lastMatchAt || 0);
+    return since >= span ? 0 : Math.max(0, span - since);
+  };
+
   // State.fridgeStatus() (SPEC-V7 §3, capacity source REPLACED by
   // SPEC-V11 §2): read-only — whether the player has a storage-providing
   // fridge PLACED, its combined capacity, current energy-drink stock, and
@@ -2790,7 +2849,16 @@
     var d = State.data;
     var capacity = currentFridgeCapacity(d);
     var hasFridge = capacity > 0;
-    var stock = d.owned.energy_can || 0;
+    /* V22c (owner item 5): capacity is shared across EVERY fridge-stored
+       drink, not just the can — 2 energy drinks + 2 calming syrups fills a
+       4-slot mini-fridge exactly. Derived from the `requiresFridge` flag
+       rather than a hand-written id list, so a future drink is counted the
+       moment it is added to the catalog and nobody has to remember this. */
+    var stock = 0;
+    var catalog = Data().shopItems || [];
+    for (var si = 0; si < catalog.length; si++) {
+      if (catalog[si].requiresFridge) stock += (d.owned[catalog[si].id] || 0);
+    }
     var remaining = Math.max(0, capacity - stock);
     var reason = null;
     if (!hasFridge) reason = 'no-fridge';
@@ -3314,7 +3382,16 @@
     if (State.data.dead) return { ok: false, reason: 'dead' };
     var rc = roomCompletenessFor(State.data);
     if (!rc.complete) return { ok: false, reason: 'room-incomplete', missing: rc.missing };
+    /* V22c (owner item 4): a real-time floor between matches, so ELO cannot be
+       farmed by holding the button down. Checked BEFORE useEnergy() — a
+       cooldown refusal must not silently charge the player 20 energy.
+       Wall-clock, not day-based, because the farm it prevents happens inside a
+       single day; and stored as an absolute epoch so it survives a reload
+       rather than resetting every time the page is refreshed. */
+    var cdLeft = State.matchCooldownRemaining();
+    if (cdLeft > 0) return { ok: false, reason: 'cooldown', remainingMs: cdLeft };
     if (!State.useEnergy(Data().energyCosts.play)) return { ok: false, reason: 'energy' };
+    State.data.lastMatchAt = Date.now();
     var d = State.data;
     var hasForm = d.form && d.form.day === d.day;
     var mForm = hasForm ? d.form.mult : 0;

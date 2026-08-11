@@ -104,6 +104,12 @@
   --r-consumer:   #b0c3d9;
   --r-milspec:    #4b69ff;
   --r-restricted: #8847ff;
+  /* CALMING SYRUP (V22c). Its own token, not a reuse of --r-restricted above:
+     that one means "restricted rarity" and this one means "the syrup", and a
+     shared literal is how two unrelated things end up locked to one colour.
+     Deliberately a deeper, less electric purple than the rarity violet so the
+     hub button does not read as a rarity badge. */
+  --syrup: #7A3FCC;
   --r-classified: #d32ce6;
   --r-covert:     #eb4b4b;
   --r-rare:       #ffd700;

@@ -575,6 +575,21 @@ body {
   transform: translateY(3px);
   box-shadow: inset 0 var(--bw) 0 rgba(0, 0, 0, .3), inset 0 calc(var(--bw) * -1) 0 rgba(255, 255, 255, .35);
 }
+/* CALMING SYRUP (V22c) — same shelf as the can, one button to its left.
+   It reuses .hub__energy-drink-btn wholesale (size, bevel, press) and
+   overrides only the fill, so the two read as a matched pair and any future
+   change to the button anatomy reaches both. `right` clears the can's 34px
+   plus the same 8px gutter the can uses against the edge. */
+.hub__syrup {
+  position: absolute; right: 50px; top: calc(8px + var(--hub-top-inset, 0px)); z-index: 4;
+  transition: top .2s ease;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.hub__syrup-btn { background: var(--syrup); }
+/* --ink-on-fill is tuned for the can's bright gold; on this darker purple it
+   would sink, so the bottle keeps the pale ink the rest of the chrome uses. */
+.hub__syrup-btn { color: var(--ink-head); }
+
 .hub__energy-drink-icon { width: 18px; height: 18px; display: block; }
 /* Appearance in "V20 §D — THE DEAD KEY" at the end of this file. */
 .hub__energy-drink-btn--disabled { cursor: not-allowed; }

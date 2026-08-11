@@ -298,6 +298,20 @@
             '</button>' +
             '<span class="hub__energy-drink-count" id="hub-energy-drink-count">0</span>' +
           '</div>' +
+          // V22c (owner item 5) — CALMING SYRUP, its own button beside the can.
+          // Same anatomy as the energy drink so the two read as one shelf; the
+          // bottle silhouette and the purple fill are what tell them apart.
+          // Authored SVG, no emoji (ART-DIRECTION §2.5).
+          '<div class="hub__syrup" id="hub-syrup">' +
+            '<button class="hub__energy-drink-btn hub__syrup-btn" id="hub-syrup-btn" aria-label="Drink calming syrup" title="CALMING SYRUP">' +
+              '<svg viewBox="0 0 24 24" class="hub__energy-drink-icon">' +
+                '<rect x="10" y="2" width="4" height="3" rx="0.5" fill="currentColor"/>' +
+                '<path d="M9 5h6l1.6 3.4v11.4a1.7 1.7 0 01-1.7 1.7H9.1a1.7 1.7 0 01-1.7-1.7V8.4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>' +
+                '<path d="M8.2 12.5h7.6v7.2a1 1 0 01-1 1H9.2a1 1 0 01-1-1z" fill="currentColor" opacity="0.85"/>' +
+              '</svg>' +
+            '</button>' +
+            '<span class="hub__energy-drink-count" id="hub-syrup-count">0</span>' +
+          '</div>' +
           '<div class="hub__sleep-dim" id="hub-sleep-dim">' +
             '<div class="hub__sleep-zzz" id="hub-sleep-zzz"><span>Z</span><span>z</span><span>Z</span></div>' +
           '</div>' +
@@ -371,6 +385,9 @@
     els.locationRent = document.getElementById('hub-location-rent');
     els.energyDrinkWrap = document.getElementById('hub-energy-drink');
     els.energyDrinkBtn = document.getElementById('hub-energy-drink-btn');
+    els.syrupWrap = document.getElementById('hub-syrup');
+    els.syrupBtn = document.getElementById('hub-syrup-btn');
+    els.syrupCount = document.getElementById('hub-syrup-count');
     els.energyDrinkCount = document.getElementById('hub-energy-drink-count');
     els.sleepDim = document.getElementById('hub-sleep-dim');
     els.ctxStashBtn = document.getElementById('hub-ctx-stash');
@@ -422,6 +439,7 @@
       window.Game.Router.go('locations');
     });
     els.energyDrinkBtn.addEventListener('click', onDrinkEnergyDrink);
+    els.syrupBtn.addEventListener('click', onDrinkSyrup);
     els.packingCancelBtn.addEventListener('click', onCancelMove);
     els.packingMoveOutBtn.addEventListener('click', onMoveOut);
 
@@ -2173,15 +2191,63 @@
     // EDIT ROOM/CAREER/STATS/SLEEP in those states, rather than leaving a
     // tappable can up that just toasts blockIfLocked's error every time.
     var locked = !!(State.data.moving || State.data.asleep);
-    els.energyDrinkWrap.style.display = locked ? 'none' : '';
-    if (locked) return;
     var status = State.energyDrinkStatus();
+    /* V22c (owner item 5): the button only exists when you actually own the
+       drink. An always-visible can that only ever says "NONE OWNED — BUY SOME
+       IN THE SHOP" is a permanent dead control taking up the corner; showing
+       it the moment you have one is the same information doing useful work.
+       Hidden while moving/asleep for the reason below. */
+    els.energyDrinkWrap.style.display = (locked || status.owned <= 0) ? 'none' : '';
+    refreshSyrupUI(locked);
+    if (locked || status.owned <= 0) return;
     els.energyDrinkCount.textContent = status.owned;
     var disabled = !status.canDrink;
     window.Game.UI.setDisabled(els.energyDrinkBtn, disabled, 'hub__energy-drink-btn--disabled');
     els.energyDrinkBtn.title = disabled ?
       ('ENERGY DRINK — ' + (ENERGY_DRINK_REASON_TEXT[status.reason] || 'UNAVAILABLE')) :
       ('ENERGY DRINK — +' + status.restoreEnergy + ' ENERGY (' + status.drinksLeftToday + ' LEFT TODAY)');
+  }
+
+  // V22c (owner item 5) — the syrup's own status/handler pair, mirroring the
+  // energy drink's exactly so both buttons behave identically.
+  var SYRUP_REASON_TEXT = {
+    'none-owned': 'NONE OWNED — BUY SOME IN THE SHOP',
+    'no-energy': 'YOUR ENERGY IS ALREADY EMPTY'
+  };
+
+  function refreshSyrupUI(locked) {
+    if (!els.syrupWrap) return;
+    var State = window.Game.State;
+    if (!State.data || !State.calmingSyrupStatus) { els.syrupWrap.style.display = 'none'; return; }
+    var status = State.calmingSyrupStatus();
+    els.syrupWrap.style.display = (locked || status.owned <= 0) ? 'none' : '';
+    if (locked || status.owned <= 0) return;
+    els.syrupCount.textContent = status.owned;
+    var disabled = !status.canDrink;
+    window.Game.UI.setDisabled(els.syrupBtn, disabled, 'hub__energy-drink-btn--disabled');
+    els.syrupBtn.title = disabled ?
+      ('CALMING SYRUP — ' + (SYRUP_REASON_TEXT[status.reason] || 'UNAVAILABLE')) :
+      ('CALMING SYRUP — DRAINS ' + status.drainAmount + ' ENERGY SO YOU CAN SLEEP');
+  }
+
+  function onDrinkSyrup() {
+    if (blockIfLocked()) return;
+    var State = window.Game.State;
+    var status = State.calmingSyrupStatus ? State.calmingSyrupStatus() : null;
+    if (status && !status.canDrink) {
+      window.Game.UI.beep('miss');
+      window.Game.UI.toast('CAN\'T DRINK — ' + (SYRUP_REASON_TEXT[status.reason] || 'UNAVAILABLE'), 'bad');
+      return;
+    }
+    var res = State.drinkCalmingSyrup();
+    if (!res.ok) {
+      window.Game.UI.beep('miss');
+      window.Game.UI.toast('CAN\'T DRINK — ' + (SYRUP_REASON_TEXT[res.reason] || 'UNAVAILABLE'), 'bad');
+      return;
+    }
+    window.Game.UI.beep('click');
+    window.Game.UI.toast('CALMING SYRUP — ENERGY DRAINED, GO GET SOME SLEEP', 'good');
+    syncHubChrome();
   }
 
   function onDrinkEnergyDrink() {

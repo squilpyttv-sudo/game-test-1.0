@@ -1751,26 +1751,20 @@
     crispStroke(ctx, [P(ox + w * 0.06, oy + d * 0.15 + legT, capZ), P(ox + w * 0.06 + legT, oy + d * 0.15 + legT, capZ)], '#8A93A8', false);
     crispStroke(ctx, [P(ox + w - legT - w * 0.06, oy + d * 0.15 + legT, capZ), P(ox + w - w * 0.06, oy + d * 0.15 + legT, capZ)], '#8A93A8', false);
 
-    if (tier === 1) {
-      /* FLATPACK (owner report): this used to hang a drawer unit under the
-         tabletop — a w*0.30 x d*0.76 x legH*0.75 block in mulColor(top, 0.65).
-         At that size it was not a detail on the desk, it was a second object
-         beside it, and off tier 1's blue-grey top the tint landed somewhere
-         near grey. The owner read it as "some kind of grey box attached to the
-         desk", which is exactly what it was.
+    /* FLATPACK: no extra furniture under the tabletop, deliberately.
 
-         Replaced with a MODESTY PANEL: a thin sheet spanning the back edge
-         between the legs. That is a real flatpack-desk feature and, unlike the
-         drawer, it lives INSIDE the desk's own footprint — 0.03 deep against
-         the back edge, so it can never read as a separate volume from any
-         angle. It still gives tier 1 the "assembled furniture" cue that tier
-         0's bare sawhorse lacks, which is the job the drawer was there to do.
+       Two attempts have now failed here. The original hung a drawer unit,
+       which read as "a grey box attached to the desk" (owner's words). Its
+       replacement was a thin modesty panel across the back edge — better, but
+       at some rotations it read as a flat plate hanging off the side, because
+       a 0.03-deep sheet seen edge-on is a line, and seen face-on is a slab
+       that does not visibly belong to the legs.
 
-         mulColor(top, 0.72) keeps it plainly the same material as the
-         tabletop, one step darker for the shaded inner face — not a new
-         colour, and never grey. */
-      box(ctx, ox + w * 0.06, oy + d * 0.10, legH * 0.28, w * 0.88, 0.03, legH * 0.58, mulColor(top, 0.72), camera);
-    }
+       The lesson both times is the same: this desk is 33px wide on screen, and
+       there is no room for a sub-detail that has to survive four rotations.
+       The tier reads through its SIZE, its apron and its colour, all of which
+       already differ from plywood. Nothing goes under the tabletop.
+       Do not add a third thing here. */
     if (tier >= 2) {
       // RGB underglow strip along the front apron face — front-face only
       if (F.front) box(ctx, ox + w * 0.06, frontY - 0.01, legH + 0.3, w * 0.86, 0.03, apronH * 0.6, '#8847ff', camera);
@@ -3184,6 +3178,44 @@
     }
   }
 
+  /* CALMING SYRUP (V22c, owner item 5) — a squat purple bottle.
+
+     Its own family rather than a fifth `energyUp` tier: that family is the
+     max-energy UPGRADE ladder (can -> minifridge -> fridge -> IV drip) and
+     bolting an unrelated consumable onto its end would make `tier` mean two
+     different things. This only ever renders as a SHOP ICON — the item is a
+     consumable and is never placed in the room — but it still needs a propMap
+     entry, because drawFamily() silently no-ops on a missing one and the shop
+     tile would come back blank (HANDOFF-V2 §5.2).
+
+     Read at icon scale comes from the silhouette, not the detail: a wide
+     shoulder stepping into a narrow neck, which is unmistakably a bottle next
+     to the can's straight cylinder. */
+  props.syrup = function (ctx, gx, gy, tier, camera, time, rot) {
+    var box = rotatedBoxRamp(gx, gy, rot);
+    var P = detailer(gx, gy, rot, camera);
+    var F = faces(rot);
+    var GLASS = { top: '#9A5CE8', left: '#7A3FCC', right: '#4E2585' };
+    var LIQUID = { top: '#C79AF5', left: '#A06FE0', right: '#6B3AA8' };
+    var CAP = { top: '#5A6070', left: '#454B5C', right: '#2A2F3D' };
+
+    box(ctx, gx + 0.33, gy + 0.36, 0, 0.34, 0.30, 1.5, GLASS, camera);          // base
+    box(ctx, gx + 0.32, gy + 0.35, 1.5, 0.36, 0.32, 7, LIQUID, camera);          // filled body
+    box(ctx, gx + 0.35, gy + 0.38, 8.5, 0.30, 0.26, 2, GLASS, camera);           // shoulder
+    box(ctx, gx + 0.42, gy + 0.44, 10.5, 0.16, 0.14, 3, GLASS, camera);          // neck
+    box(ctx, gx + 0.41, gy + 0.43, 13.5, 0.18, 0.16, 1.8, CAP, camera);          // cap
+
+    // A pale label band across the filled body, front face only — the one
+    // detail that survives at icon size and stops the bottle reading as a
+    // solid purple block.
+    if (F.front) {
+      box(ctx, gx + 0.325, gy + 0.35 + 0.32 - 0.01, 3.2, 0.35, 0.02, 2.6,
+        { top: '#E8DCF5', left: '#D6C4EC', right: '#A896C4' }, camera);
+    }
+    // Highlight down the lit edge, same 1px glare the can uses.
+    if (F.front) crispStroke(ctx, [P(gx + 0.345, gy + 0.67, 2.5), P(gx + 0.345, gy + 0.67, 8)], '#D9BEFF', false);
+  };
+
   props.energyUp = function (ctx, gx, gy, tier, camera, time, rot) {
     var box = rotatedBoxRamp(gx, gy, rot);
     var P = detailer(gx, gy, rot, camera);
@@ -3548,6 +3580,9 @@
 
     // Max-energy upgrades (SPEC-V3 §10) — stacking, tier by device.
     energy_can:        { family: 'energyUp', tier: 0 },
+    // V22c: a consumable, never placed — but drawFamily() no-ops without an
+    // entry here, which would leave a blank tile in the shop (§5.2).
+    calming_syrup:     { family: 'syrup',    tier: 0 },
     energy_minifridge: { family: 'energyUp', tier: 1 },
     energy_fridge:     { family: 'energyUp', tier: 2 },
     energy_ivdrip:     { family: 'energyUp', tier: 3 }
@@ -3991,9 +4026,35 @@
       e.order = (rotatedDepth(e.p, cy) > deskDepth) ? 1.5 : 0.5;
     });
 
+    /* V22c (owner report): a chair showing THROUGH a bed placed in front of it.
+
+       The painter's key was the prop's ANCHOR tile, `p.x + p.y`. That is only
+       the prop's depth for a 1x1 item. A bed is {w:2,d:1}: anchored at (2,3)
+       it also covers (3,3), so it physically reaches depth 6 while sorting as
+       if it were at 5 — and any 1x1 prop on a depth-5-or-6 tile could win the
+       comparison and paint over it. The bed was not "transparent"; it was
+       simply drawn too early.
+
+       Sorting by the FRONT-MOST tile a prop actually occupies fixes it for
+       every multi-tile item at once — the bed, the 2x1 recovery pod, wide
+       windows — rather than special-casing beds. footprintTiles() is the same
+       function placement and collision already use, so the depth a prop is
+       drawn at can never disagree with the tiles it really occupies. */
+    placed.forEach(function (e) {
+      var maxDepth = e.p.x + e.p.y;
+      try {
+        var tiles = window.Game.State.footprintTiles(e.def, e.p.x, e.p.y, e.p.rot || 0);
+        for (var i = 0; i < tiles.length; i++) {
+          var dsum = tiles[i].x + tiles[i].y;
+          if (dsum > maxDepth) maxDepth = dsum;
+        }
+      } catch (err) { /* keep the anchor depth if footprintTiles is unavailable */ }
+      e.depth = maxDepth;
+    });
+
     placed.sort(function (a, b) {
-      var ka = a.p.x + a.p.y + a.order * 0.01;
-      var kb = b.p.x + b.p.y + b.order * 0.01;
+      var ka = a.depth + a.order * 0.01;
+      var kb = b.depth + b.order * 0.01;
       return ka - kb;
     });
 

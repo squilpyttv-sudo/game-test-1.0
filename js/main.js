@@ -825,7 +825,15 @@
       // SPEC-V5 §5r: onNavClick already blocks this before it's reachable,
       // but State.playMatch() can also fail for the ordinary energy reason —
       // keep both messages accurate rather than always blaming energy.
-      window.Game.UI.toast(res.reason === 'room-incomplete' ? roomIncompleteMessage() : 'NOT ENOUGH ENERGY', 'bad');
+      // V22c (owner item 4): the anti-farm cooldown is its own refusal and
+      // needs its own message — telling a player "NOT ENOUGH ENERGY" when
+      // they have a full bar is the kind of wrong error that reads as a bug.
+      var msg;
+      if (res.reason === 'room-incomplete') msg = roomIncompleteMessage();
+      else if (res.reason === 'cooldown') {
+        msg = 'STILL COOLING DOWN — ' + Math.ceil((res.remainingMs || 0) / 1000) + 'S UNTIL THE NEXT MATCH';
+      } else msg = 'NOT ENOUGH ENERGY';
+      window.Game.UI.toast(msg, 'bad');
       window.Game.UI.beep('miss');
       return;
     }

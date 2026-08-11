@@ -1016,11 +1016,155 @@ check('#5 the zoom-out floor is looser in every room bigger than the basement', 
 });
 
 /* ---- #3 / #9: the two art defects -------------------------------------- */
-check('#3 the flatpack desk no longer hangs a drawer block under the tabletop', function () {
+check('#3 nothing hangs under the flatpack tabletop — no drawer, no panel', function () {
   var src = fs.readFileSync(path.join(ROOT, 'js/iso.js'), 'utf8');
+  // Attempt 1: the drawer unit that read as a detached grey box.
   assert.ok(!/IKEA: a small drawer unit hanging under the tabletop/.test(src),
-    'the drawer unit that read as a detached grey box is still there');
-  assert.ok(/FLATPACK \(owner report\)/.test(src), 'expected the replacement modesty panel');
+    'the drawer unit is back');
+  // Attempt 2: the modesty panel, which read as a plate hanging off the side
+  // at some rotations (owner screenshots).
+  assert.ok(!/Replaced with a MODESTY PANEL/.test(src), 'the modesty panel is back');
+  assert.ok(/Do not add a third thing here/.test(src),
+    'expected the note recording why this space stays empty');
+  // And the tier-1 branch must no longer draw anything of its own.
+  var desk = /props\.desk = function[\s\S]*?\n  \};/.exec(src);
+  assert.ok(desk, 'could not isolate props.desk');
+  assert.ok(!/if \(tier === 1\) \{/.test(desk[0]),
+    'props.desk still has a tier-1-only body — the flatpack should draw nothing extra');
+});
+
+/* ==== V22c ================================================================ */
+
+check('c1 a career starts on 25 hype, enough to be scouted at all', function () {
+  var w = freshGame();
+  assert.strictEqual(w.Game.Data.hypeStart, 25);
+  assert.strictEqual(w.Game.State.data.hype, 25,
+    'a fresh save must open on Data.hypeStart, not 0');
+  // ...and still nowhere near the tier 1 gate, which is a separate rule.
+  assert.ok(w.Game.State.data.hype < w.Game.Data.tier1Gate.hype,
+    'the starting hype must not accidentally satisfy the tier 1 gate');
+});
+
+check('c1 the starting hype survives a save -> reload in a fresh VM', function () {
+  var store = {};
+  var w = freshGame(store);
+  assert.strictEqual(w.Game.State.data.hype, 25);
+  w.Game.State.save();
+  var w2 = freshGame(store);
+  assert.strictEqual(w2.Game.State.data.hype, 25, 'hype was dropped or reset on load');
+});
+
+check('c2 multi-tile props sort by their FRONT-most tile, not their anchor', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/iso.js'), 'utf8');
+  assert.ok(!/var ka = a\.p\.x \+ a\.p\.y \+ a\.order \* 0\.01;/.test(src),
+    'the sort still keys off the anchor tile, so a 2x1 bed draws too early');
+  assert.ok(/e\.depth = maxDepth;/.test(src) && /footprintTiles\(e\.def/.test(src),
+    'depth should be the max x+y across the prop\'s real footprint tiles');
+
+  // Prove the bug case numerically: a bed at (2,3) {w:2,d:1} reaches depth 6,
+  // so a chair at (3,2) — anchor depth 5 — must NOT be able to paint over it.
+  var w = freshGame();
+  var S = w.Game.State;
+  var bed = S.findShopItem('bed_mattress');
+  var tiles = S.footprintTiles(bed, 2, 3, 0);
+  var maxDepth = Math.max.apply(null, tiles.map(function (t) { return t.x + t.y; }));
+  assert.strictEqual(maxDepth, 6, 'the bed should reach depth 6, got ' + maxDepth);
+  assert.ok(maxDepth > (2 + 3), 'its anchor depth (5) understates where it actually reaches');
+});
+
+check('c4 PLAY has a real-time cooldown, checked before energy is spent', function () {
+  var w = freshGame();
+  var S = w.Game.State, d = S.data;
+  assert.ok(w.Game.Data.matchCooldownMs > 0, 'expected a cooldown span');
+  furnish(w);
+  d.dead = false; d.energy = d.energyMax;
+  var first = S.playMatch();
+  assert.strictEqual(first.ok, true, 'first match should play: ' + first.reason);
+  var energyAfterFirst = d.energy;
+
+  var second = S.playMatch();
+  assert.strictEqual(second.ok, false, 'a second match immediately after must be refused');
+  assert.strictEqual(second.reason, 'cooldown');
+  assert.ok(second.remainingMs > 0, 'the refusal should say how long is left');
+  assert.strictEqual(d.energy, energyAfterFirst,
+    'a cooldown refusal must NOT charge energy — that would be a silent double cost');
+
+  // and it clears once the span has passed
+  d.lastMatchAt = Date.now() - (w.Game.Data.matchCooldownMs + 10);
+  assert.strictEqual(S.matchCooldownRemaining(), 0);
+  d.energy = d.energyMax;
+  assert.strictEqual(S.playMatch().ok, true, 'should play again once the cooldown expires');
+});
+
+check('c4 lastMatchAt is in defaultData and survives a reload', function () {
+  var store = {};
+  var w = freshGame(store);
+  assert.notStrictEqual(w.Game.State.data.lastMatchAt, undefined,
+    'lastMatchAt missing from defaultData — normalizeSave would drop it (§5.1)');
+  w.Game.State.data.lastMatchAt = 1234567;
+  w.Game.State.save();
+  var w2 = freshGame(store);
+  assert.strictEqual(w2.Game.State.data.lastMatchAt, 1234567);
+});
+
+check('c5 calming syrup exists, is purple-tier priced, and drains 60%', function () {
+  var w = freshGame();
+  var S = w.Game.State;
+  var def = S.findShopItem('calming_syrup');
+  assert.ok(def, 'calming_syrup missing from the catalog');
+  assert.strictEqual(def.category, 'consumable', 'it belongs in the DRINKS tab');
+  assert.strictEqual(def.price, 100);
+  assert.strictEqual(def.drainEnergyPct, 0.60);
+  assert.strictEqual(def.requiresFridge, true, 'it must need a fridge like the can');
+});
+
+check('c5 drinking the syrup removes exactly 60% of MAX energy', function () {
+  var w = freshGame();
+  var S = w.Game.State, d = S.data;
+  d.owned.calming_syrup = 2;
+  d.energyMax = 100; d.energy = 100;
+  var res = S.drinkCalmingSyrup();
+  assert.strictEqual(res.ok, true, res.reason);
+  assert.strictEqual(Math.round(d.energy), 40, 'expected 100 - 60 = 40, got ' + d.energy);
+  assert.strictEqual(d.owned.calming_syrup, 1, 'it must consume one bottle');
+  // never below zero
+  d.energy = 10;
+  S.drinkCalmingSyrup();
+  assert.strictEqual(d.energy, 0, 'energy must clamp at 0, not go negative');
+});
+
+check('c5 fridge capacity is SHARED between cans and syrup', function () {
+  var w = freshGame();
+  var S = w.Game.State, d = S.data;
+  d.placed = [{ id: 'energy_minifridge', x: 0, y: 0, rot: 0 }];
+  d.owned.energy_minifridge = 1;
+  var cap = S.fridgeStatus().capacity;
+  assert.ok(cap > 0, 'a placed minifridge should provide capacity');
+
+  d.owned.energy_can = 2; d.owned.calming_syrup = 0;
+  assert.strictEqual(S.fridgeStatus().stock, 2, 'cans alone should count');
+  d.owned.calming_syrup = 2;
+  assert.strictEqual(S.fridgeStatus().stock, 4, 'syrup must count against the SAME capacity');
+  assert.strictEqual(S.fridgeStatus().canBuyDrink, cap > 4,
+    '2 cans + 2 syrups should fill a 4-slot fridge exactly');
+});
+
+check('c5 the syrup has a propMap entry, or its shop tile renders blank', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/iso.js'), 'utf8');
+  assert.ok(/calming_syrup:\s*\{ family: 'syrup'/.test(src),
+    'missing propMap entry — drawFamily() silently no-ops (§5.2)');
+  assert.ok(/props\.syrup = function/.test(src), 'the syrup family has no art');
+});
+
+check('c5 both drink buttons hide when you own none of that drink', function () {
+  var hub = fs.readFileSync(path.join(ROOT, 'js/hub.js'), 'utf8');
+  assert.ok(/status\.owned <= 0\) \? 'none' : ''/.test(hub),
+    'the energy drink button should hide at zero owned');
+  assert.ok(/function refreshSyrupUI/.test(hub) && /onDrinkSyrup/.test(hub),
+    'the syrup needs its own refresh + handler pair');
+  var css = fs.readFileSync(path.join(ROOT, 'css/style.css'), 'utf8');
+  assert.ok(/\.hub__syrup-btn \{ background: var\(--syrup\); \}/.test(css),
+    'the syrup button must use the --syrup token');
 });
 
 check('#9 the fan grille is sized from projected geometry, not from sqrt(scale)', function () {

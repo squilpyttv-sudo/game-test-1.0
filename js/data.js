@@ -538,6 +538,20 @@
      A hype LOSS on a tournament defeat is deliberately larger than a win's
      gain: hype should be volatile and earned repeatedly, which is what stops
      it from ratcheting to 100 and staying there. */
+  /* V22c (owner item 1): a career STARTS on some hype. When hype became a
+     tournament-driven stat, 0 became a dead start: tier 3 teams want hype
+     before they will offer, and tournaments only exist once you are signed —
+     a career could never open the door it needed to walk through. 25 clears
+     the tier 3 bar without touching the tier 1 gate (which needs 100). */
+  Data.hypeStart = 25;
+
+  /* V22c (owner item 4): a real-time floor between solo PLAY matches, so ELO
+     cannot be farmed by spamming the button. Energy alone was not a brake —
+     an ad refill or a stack of energy drinks removes it entirely. 45s is long
+     enough to stop machine-gunning and short enough that ordinary play never
+     notices it (a match already costs 20 energy = ~20s of regen). */
+  Data.matchCooldownMs = 45000;
+
   Data.hype = {
     trainS: 1,             // a perfect TRAIN session
     matchWin: 0,           // solo PLAY win — no longer a hype source
@@ -1104,6 +1118,16 @@
     // until a storage-providing energy fridge is placed, and blocked once
     // owned.energy_can reaches the placed fridges' combined capacity.
     { id: 'energy_can', name: 'ENERGY DRINK', category: 'consumable', band: 'starter', price: 20, restoreEnergy: 25, requiresFridge: true, stats: {}, desc: 'A can from the stockpile. Drink it for +25 energy, up to 4 a day. Requires a placed fridge to store.' },
+    /* V22c (owner item 5) — CALMING SYRUP. The mirror image of the energy
+       drink: it DRAINS 60% of your maximum energy. That is a feature, not a
+       cost — energy has to be low to sleep, and sleeping is what advances the
+       day, pays salary/subscribers and rolls the tournament clock. This is the
+       button for "I want tomorrow now".
+
+       requiresFridge puts it under the SAME storage rule as the can, and
+       State.fridgeStatus() counts BOTH stocks against one capacity — 2 cans
+       plus 2 syrups fills a 4-slot mini-fridge exactly. */
+    { id: 'calming_syrup', name: 'CALMING SYRUP', category: 'consumable', band: 'starter', price: 100, drainEnergyPct: 0.60, requiresFridge: true, stats: {}, desc: 'Thick purple syrup. Drains 60% of your energy so you can actually sleep. Shares fridge space with your cans.' },
 
     // ---- REGEN (SPEC-V6 §7) — daytime-only regen boosters, placed props.
     // Stack additively while placed; total bonus hard-capped at
