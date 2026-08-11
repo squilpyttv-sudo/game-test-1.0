@@ -1072,28 +1072,152 @@ check('c2 multi-tile props sort by their FRONT-most tile, not their anchor', fun
   assert.ok(maxDepth > (2 + 3), 'its anchor depth (5) understates where it actually reaches');
 });
 
-check('c4 PLAY has a real-time cooldown, checked before energy is spent', function () {
+/* V22d REPLACED V22c's 45s button-blocking cooldown with a 15s ACTIVE match
+   (js/matchgames.js). The brake is now time spent PLAYING, not time locked
+   out, so playMatch() no longer refuses back-to-back calls. */
+check('d1 PLAY no longer refuses on cooldown — the brake is the active match', function () {
   var w = freshGame();
   var S = w.Game.State, d = S.data;
-  assert.ok(w.Game.Data.matchCooldownMs > 0, 'expected a cooldown span');
   furnish(w);
   d.dead = false; d.energy = d.energyMax;
   var first = S.playMatch();
   assert.strictEqual(first.ok, true, 'first match should play: ' + first.reason);
-  var energyAfterFirst = d.energy;
-
-  var second = S.playMatch();
-  assert.strictEqual(second.ok, false, 'a second match immediately after must be refused');
-  assert.strictEqual(second.reason, 'cooldown');
-  assert.ok(second.remainingMs > 0, 'the refusal should say how long is left');
-  assert.strictEqual(d.energy, energyAfterFirst,
-    'a cooldown refusal must NOT charge energy — that would be a silent double cost');
-
-  // and it clears once the span has passed
-  d.lastMatchAt = Date.now() - (w.Game.Data.matchCooldownMs + 10);
-  assert.strictEqual(S.matchCooldownRemaining(), 0);
   d.energy = d.energyMax;
-  assert.strictEqual(S.playMatch().ok, true, 'should play again once the cooldown expires');
+  var second = S.playMatch();
+  assert.strictEqual(second.ok, true,
+    'a second match must NOT be refused on cooldown — V22d removed that gate');
+});
+
+check('d1 playMatch still charges energy, and still refuses without it', function () {
+  var w = freshGame();
+  var S = w.Game.State, d = S.data;
+  furnish(w);
+  d.dead = false; d.energy = d.energyMax;
+  var before = d.energy;
+  var res = S.playMatch();
+  assert.strictEqual(res.ok, true);
+  assert.ok(d.energy < before, 'a played match must cost energy — removing the cooldown must not have removed the charge');
+  assert.strictEqual(d.energy, before - w.Game.Data.energyCosts.play, 'it should cost exactly the PLAY cost');
+  d.energy = 0;
+  assert.strictEqual(S.playMatch().reason, 'energy', 'with no energy it must still refuse');
+});
+
+check('d2 the match overlay exists, is 15s, and rotates three distinct games', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  assert.ok(/var MATCH_MS = 15000;/.test(src), 'the master timer must be 15s');
+  assert.ok(/WIN_HOLD_MS = 1500/.test(src), 'a win should hold 1.5s before the card');
+  ['makeAwp', 'makeSpray', 'makeBhop'].forEach(function (fn) {
+    assert.ok(new RegExp('function ' + fn + '\\(').test(src), 'missing minigame: ' + fn);
+  });
+  assert.ok(/IDS = \['awp', 'spray', 'bhop'\]/.test(src), 'expected all three in the rotation');
+  // no immediate repeat, same rule the music shuffle needs
+  assert.ok(/id !== lastGameId/.test(src), 'the rotation must not repeat the last game');
+  // TRY AGAIN must not appear when there is no time left to try in
+  assert.ok(/remaining\(\) > 900/.test(src), 'TRY AGAIN should be withheld when the clock is nearly out');
+  assert.ok(/TRY AGAIN/.test(src) && /QUIT/.test(src), 'both fail buttons must exist');
+});
+
+check('d2 the AWP game uses the owner-specified windows', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  assert.ok(/1500 \+ Math\.random\(\) \* 2000/.test(src), 'peek delay should be 1.5-3.5s');
+  assert.ok(/reactionMs <= 300/.test(src), 'the reaction window should be 300ms');
+  assert.ok(/killfeedUntil/.test(src), 'a win should show a killfeed');
+});
+
+check('d3 the AWP crosshair sits dead centre of the peek gap', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  // The gap is derived FROM the centre line, so the two cannot drift apart.
+  assert.ok(/gapX = Math\.round\(w \/ 2 - gapW \/ 2\)/.test(src),
+    'the gap must be centred on the scope, not placed independently');
+  assert.ok(/var cxs = w \/ 2\b/.test(src), 'the reticle must sit on the centre line');
+  // The doors are solid and the view-through is clipped; punching the gap by
+  // skipping plank columns quantised it to the 12px plank pitch.
+  assert.ok(/c\.rect\(gapX, 0, gapW, doorBottom\)[\s\S]{0,40}c\.clip\(\)/.test(src),
+    'the view through the doors should be clipped to an exact gap rect');
+});
+
+check('d3 the bhop map is textured as Nuke, not as a radar', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  ['hatch', 'cont', 'truck', 'pipe', 'bay', 'curb'].forEach(function (t) {
+    assert.ok(new RegExp("P\\.t === '" + t + "'").test(src), 'missing ground prop: ' + t);
+  });
+  assert.ok(/BH_PROPS/.test(src), 'the plant needs set dressing');
+  assert.ok(/BH_SILO/.test(src), 'the silo is the landmark in both reference shots');
+  // Structure must be darker than every walkable surface, or the route stops
+  // reading as a route. Compare luminance rather than trusting the comment.
+  var mass = /px\(c, 0, 0, w, h, '(#[0-9A-F]{6})'\);\s+\/\/ structure mass/.exec(src);
+  var surf = /var SURF = \['(#[0-9A-F]{6})', '(#[0-9A-F]{6})', '(#[0-9A-F]{6})'\]/.exec(src);
+  assert.ok(mass && surf, 'could not read the surface palette');
+  function lum(hex) {
+    return 0.2126 * parseInt(hex.slice(1, 3), 16) +
+           0.7152 * parseInt(hex.slice(3, 5), 16) +
+           0.0722 * parseInt(hex.slice(5, 7), 16);
+  }
+  assert.ok(lum(surf[2]) - lum(mass[1]) > 24,
+    'outdoor concrete must be clearly lighter than the structure mass');
+  assert.ok(lum(mass[1]) - lum(surf[1]) > 24,
+    'the asphalt yard must be clearly darker than the structure mass');
+  // Roof dressing has to be a pure function of the world cell or it boils.
+  assert.ok(/function bhHash\(a, b\)/.test(src), 'roof scatter needs deterministic noise');
+  assert.ok(!/bhHash\([^)]*Math\.random/.test(src), 'roof scatter must not use Math.random');
+});
+
+check('d3 the Nuke route is winnable at top speed and lost at base speed', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  var m = /var BH_PATH = (\[\[[\s\S]*?\]\]);/.exec(src);
+  assert.ok(m, 'could not read the route');
+  var pathPts = JSON.parse(m[1]);
+  var track = 0, i;
+  for (i = 0; i < pathPts.length - 1; i++) {
+    var dx = pathPts[i + 1][0] - pathPts[i][0], dy = pathPts[i + 1][1] - pathPts[i][1];
+    track += Math.sqrt(dx * dx + dy * dy);
+  }
+  var lo = parseInt(/BH_MIN_SPEED = (\d+)/.exec(src)[1], 10);
+  var hi = parseInt(/BH_MAX_SPEED = (\d+)/.exec(src)[1], 10);
+  var intro = 1.3;                     // the A/D card, before the run starts
+  // Ramp is +26 per good tap on a 340ms beat, so top speed takes ~3s to reach.
+  var rampS = (hi - lo) / 26 * 0.340;
+  var rampDist = (lo + hi) / 2 * rampS;
+  var best = intro + rampS + Math.max(0, track - rampDist) / hi;
+  var worst = intro + track / lo;      // someone mashing, never holding the beat
+  assert.ok(best < 13, 'a clean run must finish inside 15s, got ' + best.toFixed(1) + 's');
+  assert.ok(worst > 15, 'base speed alone must NOT reach Outside in 15s, got ' +
+    worst.toFixed(1) + 's — the minigame would be free');
+});
+
+check('d2 the spray game wins at 80% and fires 30 rounds', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  assert.ok(/AK_PATTERN\.length/.test(src) && /pct >= 0\.80/.test(src),
+    'spray should win at 80% of the rounds hitting');
+  var m = /var AK_PATTERN = \[([\s\S]*?)\];/.exec(src);
+  assert.ok(m, 'could not read the AK pattern');
+  var pts = m[1].match(/\[-?\d+, -?\d+\]/g) || [];
+  assert.strictEqual(pts.length, 30, 'the AK sprays 30 rounds, got ' + pts.length);
+});
+
+check('d2 the bhop game ramps 250 -> 450+ and has a rhythm window', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  var lo = /BH_MIN_SPEED = (\d+)/.exec(src), hi = /BH_MAX_SPEED = (\d+)/.exec(src);
+  assert.ok(lo && hi, 'expected both speed bounds');
+  assert.strictEqual(parseInt(lo[1], 10), 250, 'base speed should be 250');
+  assert.ok(parseInt(hi[1], 10) >= 450, 'top speed should reach 450+, got ' + hi[1]);
+  assert.ok(/speed > 350/.test(src), 'motion blur should kick in above 350');
+  assert.ok(/BH_GREEN/.test(src), 'the rhythm bar needs a green window');
+  assert.ok(/speed = BH_MIN_SPEED;[\s\S]{0,120}lastHitGood = false/.test(src),
+    'an off-beat or wrong-side tap must drop the speed back to base');
+});
+
+check('d2 PLAY routes through the overlay, and rolls ELO BEFORE it opens', function () {
+  var main = fs.readFileSync(path.join(ROOT, 'js/main.js'), 'utf8');
+  var fn = /function doPlayMatch\(\)[\s\S]*?\n  \}/.exec(main);
+  assert.ok(fn, 'could not isolate doPlayMatch');
+  // the ELO roll must come first, so a player can never finish a minigame and
+  // only then be told they could not afford the match
+  var rollAt = fn[0].indexOf('State.playMatch()');
+  var runAt = fn[0].indexOf('MatchGames.run');
+  assert.ok(rollAt !== -1 && runAt !== -1, 'expected both the roll and the overlay call');
+  assert.ok(rollAt < runAt, 'playMatch() must be rolled BEFORE the overlay opens');
+  assert.ok(/showMatchResult\(res\)/.test(main), 'the result should be shown after the overlay closes');
 });
 
 check('c4 lastMatchAt is in defaultData and survives a reload', function () {

@@ -1301,3 +1301,63 @@
   color: var(--subs);
   margin-top: 2px;
 }
+
+/* ==========================================================================
+   V22d — THE 15-SECOND ACTIVE MATCH (js/matchgames.js)
+   A full-bleed overlay inside #app: master timer bar, the minigame canvas,
+   a banner and the fail buttons. It sits above the room and below the modal
+   layer, so the ELO reward card still lands on top of it when it closes.
+   ========================================================================== */
+.mg-match {
+  position: absolute; inset: 0; z-index: 9;
+  display: none; flex-direction: column;
+  background: var(--bg-deep);
+  /* No transition on display; opacity alone animates (SPEC-V18 §6 — never a
+     layout property). */
+  opacity: 0; transition: opacity .16s ease;
+}
+.mg-match--open { display: flex; opacity: 1; }
+
+.mg-match__bar {
+  flex: 0 0 auto; height: 10px;
+  background: var(--panel-lo);
+  border-bottom: var(--bw) solid var(--pixel-black);
+}
+.mg-match__bar-fill {
+  height: 100%; width: 0%;
+  background: var(--energy);
+  /* width is the ONE layout property animated here, and deliberately: it is
+     a progress bar, the thing it measures IS width, and a transform-scaled
+     fill would stretch its own pixel edge. Linear so the clock reads true. */
+  transition: width .1s linear;
+}
+
+.mg-match__label {
+  flex: 0 0 auto;
+  font-size: 9.5px; font-weight: 700; letter-spacing: 1px;
+  color: var(--ink-dim); text-align: center;
+  padding: 4px 0 2px;
+}
+
+.mg-match__canvas { flex: 1 1 auto; display: block; width: 100%; touch-action: none; }
+
+.mg-match__banner {
+  position: absolute; left: 0; right: 0; top: 42%;
+  text-align: center; pointer-events: none;
+  font-size: 17px; font-weight: 700; letter-spacing: 1px;
+  color: var(--ink-head); text-shadow: var(--text-outline);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+.mg-match__banner--show { opacity: 1; transform: translateY(0); }
+.mg-match__banner--good { color: var(--cash); }
+.mg-match__banner--bad { color: var(--danger); }
+
+.mg-match__buttons {
+  position: absolute; left: 0; right: 0; bottom: 26px;
+  display: none; gap: 10px; justify-content: center; padding: 0 18px;
+}
+.mg-match__buttons--show { display: flex; }
+/* 44px floor — these are the two most important taps in the flow and they
+   land under a thumb on a phone (HANDOFF-V2 §2 constraint 5). */
+.mg-match__btn { flex: 1 1 0; min-height: 44px; font-size: 11.5px; }

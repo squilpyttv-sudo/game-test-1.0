@@ -3382,14 +3382,13 @@
     if (State.data.dead) return { ok: false, reason: 'dead' };
     var rc = roomCompletenessFor(State.data);
     if (!rc.complete) return { ok: false, reason: 'room-incomplete', missing: rc.missing };
-    /* V22c (owner item 4): a real-time floor between matches, so ELO cannot be
-       farmed by holding the button down. Checked BEFORE useEnergy() — a
-       cooldown refusal must not silently charge the player 20 energy.
-       Wall-clock, not day-based, because the farm it prevents happens inside a
-       single day; and stored as an absolute epoch so it survives a reload
-       rather than resetting every time the page is refreshed. */
-    var cdLeft = State.matchCooldownRemaining();
-    if (cdLeft > 0) return { ok: false, reason: 'cooldown', remainingMs: cdLeft };
+    /* V22c added a 45s cooldown that BLOCKED the button. V22d replaced it
+       with the 15-second ACTIVE match (js/matchgames.js): the anti-farm brake
+       is now time the player spends PLAYING rather than time they spend
+       locked out, so the refusal is gone. State.matchCooldownRemaining() and
+       d.lastMatchAt are kept and still stamped below — they cost nothing, the
+       save field must stay for normalizeSave() anyway (§5.1), and a future
+       rule may want to know when the last match was. */
     if (!State.useEnergy(Data().energyCosts.play)) return { ok: false, reason: 'energy' };
     State.data.lastMatchAt = Date.now();
     var d = State.data;

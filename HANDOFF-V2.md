@@ -274,7 +274,7 @@ Syntax + the tokens rule:
 cd "C:/Users/User/Desktop/hujnia" && for f in js/*.js; do node --check "$f" >/dev/null 2>&1 || echo "SYNTAX FAIL: $f"; done
 ```
 ```bash
-cd "C:/Users/User/Desktop/hujnia" && grep -n "#[0-9a-fA-F]\{3,6\}" css/*.css | grep -v "^css/tokens.css" | wc -l
+cd "C:/Users/afgus/Downloads/mainhujnia/hujnia" && grep -n "#[0-9a-fA-F]\{3,6\}" css/*.css | grep -v "^css/tokens.css" | wc -l
 ```
 
 **Expected suite counts** (all currently passing — a change here is a
@@ -282,13 +282,12 @@ regression until proven otherwise):
 
 | suite | count |
 |---|---|
-| `test-v22-fixes.js` | 68 *(the owner's bug lists; add each batch here)* |
+| `test-v22-fixes.js` | 92 *(the owner's bug lists; add each batch here)* |
 | `test-v14-phone.js` | 20 *(was 19 — V22 added the SPONSORS gate test)* |
 | `test-v21-customise.js` | 18 |
 | `test-v20-customise.js` | 38 |
 | `test-v12-footprints.js` | 16 |
 | `test-v13-rules.js` | 17 |
-| `test-v14-phone.js` | 19 |
 | `test-v15-banners.js` | 15 |
 | `test-v15-tutorials.js` | 26 |
 | `test-v16-rooms.js` | 16 |

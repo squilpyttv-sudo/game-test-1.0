@@ -134,6 +134,59 @@ a save whose tower was moved to its own tile is still legal and is left alone.
 - **A warned sponsor week does not burn down its term** — otherwise failing an
   obligation would be better than meeting it.
 
+---
+
+## V22d — THE 15-SECOND ACTIVE MATCH — **DONE**
+
+PLAY no longer resolves instantly behind a cooldown. It opens
+**`js/matchgames.js`** (`Game.MatchGames`): a 15s master timer and one of three
+CS-themed minigames, picked at random with no immediate repeat.
+
+| Game | Verb | Wins when |
+|---|---|---|
+| `awp` | one reaction **tap** | you fire within 300ms of the peek (peek at 1.5–3.5s) |
+| `spray` | one continuous **drag** | you land 80% of the AK's 30 rounds |
+| `bhop` | alternating rhythmic **taps** | you reach Outside on the Nuke route |
+
+Win → the bar snaps to 100%, holds 1.5s, then the ELO card. Fail → TRY AGAIN
+(only while >900ms remains) / QUIT. Timer hits zero → force-close, ELO card
+anyway.
+
+**The minigame decides how FAST a match resolves, never WHETHER it is won.**
+`State.playMatch()` rolls ELO in `doPlayMatch()` *before* the overlay opens, so
+the player can never finish a minigame and only then be refused for energy or an
+incomplete room — and the minigame can never become a difficulty gate on core
+progression. Keep that ordering.
+
+### Things in here that are easy to break
+
+- **Three input verbs on purpose.** A rotation of three games that all wanted
+  the same gesture would read as one game with reskins.
+- **Wall-clock, not frame-accumulated.** The spray's rounds, the bhop's beat and
+  the master timer all read `Date.now()`. A dt accumulator time-dilates the
+  moment the frame rate drops, and the recoil guide would drift out of step with
+  the rounds it describes. `bhop`'s *distance* is the one dt integral left, and
+  it is why a throttled tab makes that run crawl.
+- **The bhop track length is derived from `BH_PATH`**, not typed twice. Its
+  ~3492 units are tuned so a clean run lands ~9.4s and someone mashing, stuck at
+  `BH_MIN_SPEED`, needs 15.3s and *loses*. A test asserts both ends; reshaping
+  the route without re-checking it silently makes the game free.
+- **Art is drawn from the owner's reference shots.** `awp` is scoped mid doors
+  on Dust 2 — the gap is derived from the scope centre (`gapX = w/2 - gapW/2`)
+  so the reticle is always on it. `bhop` is top-down Nuke, textured as the
+  plant: asphalt, concrete, hazard hatching, containers, the Cedar Creek blue
+  band, the ribbed silo.
+- **The bhop map is authored ROTATED 90°** so the run goes up-screen on a
+  portrait phone. Real map north is therefore screen-LEFT — that is why MAIN
+  sits left of the route and T RED right. Baking the rotation into the data
+  (instead of yawing the camera) keeps every rect axis-aligned and pixel-crisp.
+- **Structure must stay darker than every walkable surface.** The first pass
+  used near-identical greys for the roof deck and the outdoor concrete and the
+  route stopped reading as a route. A test compares their luminance.
+- **`sizeCanvas()` measures the CANVAS, not the overlay.** The canvas sits below
+  the timer bar and label; measuring the overlay gave the backing store more
+  rows than the element shows and the browser squashed every frame.
+
 ### Environment — this bit the last session, twice
 
 - **Node IS installed** (v24.19.0, `C:\Program Files\nodejs`) but is **not on
@@ -143,9 +196,15 @@ a save whose tower was moved to its own tile is still legal and is left alone.
 - Python is **not** installed, so it is not a fallback for anything.
 - The project moved to `C:\Users\afgus\Downloads\mainhujnia\hujnia`.
   `HANDOFF-V2.md` §1 still names the old Desktop path.
-- **Not a git repo.** There is no undo. Consider `git init` before large work.
-- HANDOFF-V2 §5.6 confirmed live: `screenshot` fails outright whenever the
-  Browser pane is not displayed. Use pixel/DOM inspection instead.
+- **It IS a git repo now**, pushed to `squilpyttv-sudo/game-test-1.0` and served
+  by GitHub Pages. `inspo/` and `.claude/skills/` are excluded; there is
+  deliberately no LICENSE, so all rights stay reserved.
+- HANDOFF-V2 §5.6 needs amending: `screenshot` **does** work. What actually
+  breaks is that **rAF is throttled to roughly 1fps whenever the Browser pane
+  is not being composited** — so anything driven by frame deltas crawls between
+  tool calls while wall-clock timers run on normally. To inspect a later frame,
+  stub `requestAnimationFrame` and pump it with a synthetic clock rather than
+  waiting for the game to get there.
 
 ### `/impeccable` is installed but needs a session restart
 

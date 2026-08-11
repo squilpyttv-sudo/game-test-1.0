@@ -134,7 +134,17 @@
     ban:   { freq: 700,  type: 'square',   dur: 0.10, gain: 0.18, sweep: -350 },
     cash:  { freq: 900,  type: 'triangle', dur: 0.09, gain: 0.16, sweep: 500 },
     rare:  { freq: 520,  type: 'square',   dur: 0.32, gain: 0.20, sweep: 900 },
-    click: { freq: 440,  type: 'square',   dur: 0.04, gain: 0.10 }
+    click: { freq: 440,  type: 'square',   dur: 0.04, gain: 0.10 },
+    /* V22d — the match minigames. Added as PRESETS rather than as their own
+       audio path so they inherit the SOUND slider (Game.Audio.soundVolume())
+       like every other SFX; a second player would need its own volume wiring.
+       awp:  a low crack falling fast — the rifle report.
+       dink: the high metallic ping of a helmet hit, deliberately the brightest
+             sound in the game so a failed reaction is unmistakable.
+       bhop: a short tick for an on-beat strafe; quiet, because it fires often. */
+    awp:   { freq: 300,  type: 'sawtooth', dur: 0.22, gain: 0.22, sweep: -260 },
+    dink:  { freq: 1500, type: 'square',   dur: 0.12, gain: 0.18, sweep: -700 },
+    bhop:  { freq: 640,  type: 'square',   dur: 0.03, gain: 0.07 }
   };
   UI.beep = function (kind) {
     var st = window.Game && window.Game.State && window.Game.State.data;

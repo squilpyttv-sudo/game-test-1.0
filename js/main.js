@@ -819,24 +819,42 @@
   }
 
   /* -------------------------------------------------------------------- PLAY */
+  /* V22d — PLAY is now a 15-SECOND ACTIVE MATCH.
+
+     The ELO is rolled UP FRONT, before the overlay opens, and the card is
+     shown after. That ordering is deliberate and load-bearing:
+
+       - Energy is charged and the result decided while the player is still on
+         a button they chose to press. Rolling it afterwards would mean a
+         player could finish a minigame and only then be told "NOT ENOUGH
+         ENERGY", having already done the work.
+       - The minigame therefore cannot change whether the match is won. It
+         controls PACE, not outcome — which keeps a core progression loop off
+         a dexterity gate, and keeps the whole overlay honest theatre.
+
+     Game.MatchGames.run() calls back however the match ends: minigame won,
+     QUIT, or the 15s master timer running out. Every path lands here. */
   function doPlayMatch() {
     var res = window.Game.State.playMatch();
     if (!res.ok) {
       // SPEC-V5 §5r: onNavClick already blocks this before it's reachable,
       // but State.playMatch() can also fail for the ordinary energy reason —
       // keep both messages accurate rather than always blaming energy.
-      // V22c (owner item 4): the anti-farm cooldown is its own refusal and
-      // needs its own message — telling a player "NOT ENOUGH ENERGY" when
-      // they have a full bar is the kind of wrong error that reads as a bug.
-      var msg;
-      if (res.reason === 'room-incomplete') msg = roomIncompleteMessage();
-      else if (res.reason === 'cooldown') {
-        msg = 'STILL COOLING DOWN — ' + Math.ceil((res.remainingMs || 0) / 1000) + 'S UNTIL THE NEXT MATCH';
-      } else msg = 'NOT ENOUGH ENERGY';
-      window.Game.UI.toast(msg, 'bad');
+      window.Game.UI.toast(
+        res.reason === 'room-incomplete' ? roomIncompleteMessage() : 'NOT ENOUGH ENERGY', 'bad');
       window.Game.UI.beep('miss');
       return;
     }
+    if (window.Game.MatchGames && window.Game.MatchGames.run) {
+      window.Game.MatchGames.run(function () { showMatchResult(res); });
+      return;
+    }
+    // Defensive: matchgames.js absent (an older build) — resolve immediately
+    // rather than swallowing the match the player already paid energy for.
+    showMatchResult(res);
+  }
+
+  function showMatchResult(res) {
     if (res.nudge) {
       window.Game.UI.toast('TRAIN FIRST TO SET YOUR DAILY FORM', 'info');
     }
