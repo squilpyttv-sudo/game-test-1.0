@@ -1,0 +1,1303 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/minigames.css
+   Styling for the three high-dopamine minigame screens: Aim Trainer,
+   Stream Chat Moderation, Case Unboxing. Uses ONLY tokens from
+   css/tokens.css — no raw hex values anywhere in this file.
+   ========================================================================== */
+
+/* -- shared minigame chrome ---------------------------------------------- */
+
+.mg-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px;
+  gap: 10px;
+}
+
+.mg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* V21 — THE MARKUP FIX THIS RULE ASKED FOR.
+
+   This was a <button> that hand-rolled its own keycap: its own 1px outline,
+   its own inset bevel pair, its own drop and its own :active press. The
+   comment here used to say so and deliberately declined to re-implement the
+   V18 3-tone ramp on top, on the grounds that a second copy of the ramp is
+   exactly what drifts. It was right, and the fix was always in the markup —
+   `js/aim.js`, `js/cases.js` and `js/stream.js` now emit `class="btn mg-back"`.
+
+   So everything structural is gone from here: the outline, radius, drop
+   shadow, bevels, press transform and transition all come from `.btn` and
+   `.btn:active` in css/style.css, and the ::before/::after ramp strips derive
+   themselves from `background: inherit` — which is why `background` STAYS.
+   It is this rule's only remaining job besides sizing: it is the fill the
+   ramp is computed FROM, so the two strips come out as --panel-hi lifted and
+   dropped, with no colour named twice. `color` stays for the same reason —
+   .btn's own `color: var(--ink-head)` is a brighter white than this small
+   11px label wants against --panel-hi. */
+.mg-back {
+  font: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .5px;
+  color: var(--ink);
+  background: var(--panel-hi);
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  /* Measured at 61x31 before this: the only way out of a minigame was a
+     target 13px under the 44px floor. min-height + centring rather than
+     fatter padding, so the box cannot drift back under the floor if the
+     label or the font metrics ever change. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* §2.6 — screen headers are white with the 1px black text outline. */
+.mg-title {
+  flex: 1;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+.mg-spacer { width: 54px; }
+
+.mg-ready {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px 16px;
+  gap: 12px;
+}
+
+/* V18 §4 GRID SLOT anatomy applied to the single hero slot on a ready screen:
+   recessed --slot-fill well, 1px --slot-border line, the icon floating
+   centred, all wrapped in the 1px black outer line. Same recipe as the case
+   art box and the phone/shop tiles, so one visual language covers all of it. */
+.mg-ready-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 700;
+  border-radius: var(--radius-pixel);
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  box-shadow: 0 0 0 1px var(--pixel-black);
+  color: var(--views);
+}
+
+.mg-ready-title {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+.mg-ready-copy {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  max-width: 320px;
+}
+
+/* Primary CTA — saturated gold fill with dark ink label, the brightness
+   strategy from tokens.css: light lives in a bounded outlined shape, never
+   in glowing type. This is the single button every minigame funnels into. */
+/* V18 §4: a variant sets ONLY its base colour. The two --bevel-* overrides
+   that used to sit here are gone — style.css's ramp now derives both strips
+   from this background with brightness(), so re-stating them here would be a
+   second, drifting copy of the button system. */
+/* V19 removed the `text-shadow: var(--text-outline)` this button was
+   inheriting from style.css's `.btn`. That outline is four 1px --pixel-black
+   offsets written for the WHITE-on-dark faces; under a near-black
+   --ink-on-fill label it fattens every stem into its neighbour. The saturated
+   fills opt back out of it in style.css's own list (.btn--primary/--danger/
+   --gold/.navbtn__label) and .mg-start-btn was simply missing from it. That
+   fix stands, and it is what the measured 13.59:1 dark-on-gold comes from.
+
+   V20 found the two things it left behind. Neither recolours the label — both
+   push it off the pixel grid, which is why "blurry" survived a colour fix:
+
+   1. GEOMETRY. The button was shrink-to-fit, so its width was whatever the
+      monospace label happened to measure — 114.98px — and its box therefore
+      ended on a fractional pixel. Every hard edge this world is built from
+      (the 1px --pixel-black outline, the 2px/3px ::before/::after ramp
+      strips, the 0 3px 0 drop shadow) then resolved across two device
+      columns instead of one: exactly the soft edge ART-DIRECTION's "hard,
+      never blurred" rule exists to prevent, and the bottom-nav keycaps never
+      show it because they are laid out on integer widths. It now takes the
+      same `width: 100%; max-width: 320px` column every other block on these
+      ready screens already uses (.mg-ready-copy, .mg-blocked-banner,
+      .aim-coach-note), so the box is an exact 320px on an integer origin —
+      and it reads as a full-width key like the footer tiles instead of a
+      shrink-wrapped chip.
+
+   2. THE DISABLED PATH, which is the state the STREAM screen actually hits:
+      stream.js marks GO LIVE `disabled` whenever State.roomCompleteness()
+      reports an unfinished room, and tokens.css answered that with
+      `filter: grayscale(.7) brightness(.6)`. A filter forces the element into
+      its own render surface — the label stops being painted onto the page and
+      starts being painted into a texture that is then composited — and it
+      dragged the measured label contrast from 13.59:1 to 5.01:1 on a face
+      gone muddy olive, with the .mg-cost line under it at 3.70:1. No amount
+      of label restyling recovers either.
+
+      V20 §D then generalised the fix: the filter is gone from every disabled
+      control in the game, and the dead face is stated once in the "V20 §D —
+      THE DEAD KEY" block at the end of css/style.css. This variant no longer
+      restates it. `.btn.btn--disabled` there is (0,2,0) and .mg-start-btn is
+      (0,1,0), so the dead fill, the dead ink and the restored 1px text
+      outline all land on this button from that one block without a bridge
+      rule here — which is the point, because a bridge rule is a mirror and
+      HANDOFF §9.1 is a list of what mirrors cost. Measured on the blocked
+      face now: label 7.35:1, cost line 7.35:1.
+
+   Everything the keycap needs — the 1px TRUE-black outline, the 3-tone
+   ::before/::after ramp derived from THIS background, the --btn-press drop and
+   the compressed bottom edge — still arrives from the `.btn` system the footer
+   tiles use. None of it is restated here; a variant sets only its own fill,
+   its label, and its box metrics. */
+.mg-start-btn {
+  width: 100%;
+  max-width: 320px;
+  margin: 6px auto 0;
+  padding: 16px 24px;
+  font-size: 14px;
+  background: var(--gold);
+  color: var(--ink-on-fill);
+  text-shadow: none;
+}
+
+/* CASES is the one ready screen that is NOT a centred 320px column — the case
+   art card and the drop-odds panel above and below it run the full width of
+   .cases-wrap. A 320px cap there would leave the CTA visibly short of both
+   its neighbours' right edge, so it takes the full column and stays flush.
+   Still integer: .cases-wrap resolves to a whole-pixel content box. */
+.case-open-btn { max-width: none; }
+
+/* Blocked CTA — nothing here. The dead face arrives from V20 §D; see note 2
+   in the comment above. */
+
+/* The cost line under the label. Was `opacity: .75`: opacity below 1 promotes
+   the span to its own compositing layer, which made the smallest type on the
+   screen the one piece of the button NOT painted in the same pass as the face
+   under it. The mix below lands on the same colour the blend was producing,
+   with no layer and no raw hex — 7.9:1 on gold. */
+.mg-cost {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: color-mix(in srgb, var(--ink-on-fill) 74%, var(--gold));
+  letter-spacing: 1px;
+}
+
+/* The span declares its own colour, so the button's --dead-ink does not reach
+   it by cascade — this hands it back. `inherit`, not a second mix: the cost
+   line and the label on a dead key are the same dead ink, and hierarchy
+   between them comes from the 10px/14px size step, which is the argument
+   css/style.css already makes for .navbtn__cost. 7.35:1. */
+.mg-start-btn[disabled] .mg-cost,
+.mg-start-btn.btn--disabled .mg-cost {
+  color: inherit;
+}
+
+.h-label { display: block; }
+
+/* SPEC-V5 §5r: shown on a minigame's ready screen when State.roomCompleteness()
+   reports the room isn't finished — currently only STREAM gates itself here
+   (PLAY/TRAIN/CASES/CAREER are hard-gated in state.js). */
+/* Status colour as an inner ring inside .panel's near-black outline, not as
+   a border-color override -- overriding the border deletes the ART-DIRECTION
+   2.1 edge that every object in the game carries. Matches .stream-stop-btn
+   below and .title-slot-card--dead / .stats-deadbanner in the sibling files. */
+.mg-blocked-banner {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 12px;
+  text-align: left;
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--danger),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    0 0 0 1px var(--pixel-black),
+    var(--shadow);
+}
+
+.mg-blocked-banner-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--danger);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.mg-blocked-banner-body {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+/* -- staff integration notes (coach on TRAIN, mod on STREAM) ------------- */
+
+.aim-coach-note {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 12px;
+  text-align: left;
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--views),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    0 0 0 1px var(--pixel-black),
+    var(--shadow);
+}
+
+.aim-coach-note-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--views);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.aim-coach-note-body {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.stream-mod-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--views);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* ==========================================================================
+   AIM TRAINER
+   ========================================================================== */
+
+.aim-ready-icon { color: var(--elo); }
+
+/* V18 §4 — the aim/stream HUD. Was four bare label+number columns floating on
+   one panel; now each readout is its own inset slot (--slot-fill well, 1px
+   --slot-border, 1px black outer line) so the HUD reads as a bank of gauges.
+   flex: 1 1 0 + min-width: 0 keeps all four inside 420px with no horizontal
+   overflow at any value width. */
+.aim-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--panel-lo);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  padding: 8px;
+}
+
+.aim-stat {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 3px;
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  border-radius: var(--radius-pixel);
+  box-shadow: 0 0 0 1px var(--pixel-black);
+  overflow: hidden;
+}
+
+/* §2.6 — stats are numbers, so they take the warm number colour. --num-warm
+   on --slot-fill measures 15.4:1; the --ink-dim h-label above it is 9.6:1,
+   both well over the 4.5:1 floor on this darker well. */
+.aim-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--num-warm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.aim-field {
+  position: relative;
+  flex: 1;
+  min-height: 320px;
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--views) 8%, transparent), transparent 60%),
+    var(--panel-lo);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 1px var(--slot-border),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  overflow: hidden;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* Chunky bevelled disc, not a soft glow-ball — the outline system applied
+   to a circle: near-black ring, bright top-left highlight, dark underside. */
+.aim-target {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--danger), var(--elo));
+  border: var(--bw) solid var(--outline);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .5),
+    inset 0 -3px 0 rgba(0, 0, 0, .4),
+    var(--shadow);
+  pointer-events: none;
+}
+
+.aim-fx-hit {
+  position: absolute;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border: 3px solid var(--cash);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: aimHitPop .32s ease-out forwards;
+}
+
+@keyframes aimHitPop {
+  0%   { transform: scale(.4); opacity: 1; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+
+.aim-fx-miss {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  margin-top: -8px;
+  pointer-events: none;
+  border-radius: 50%;
+  background: var(--danger);
+  opacity: .55;
+  animation: aimMissPop .3s ease-out forwards;
+}
+
+@keyframes aimMissPop {
+  0%   { transform: scale(1); opacity: .6; }
+  100% { transform: scale(.2); opacity: 0; }
+}
+
+/* ==========================================================================
+   STREAM CHAT MODERATION
+   ========================================================================== */
+
+.stream-ready-icon { color: var(--danger); }
+.stream-toxic-hl { color: var(--danger); font-weight: 700; }
+
+.stream-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel-lo);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  padding: 8px;
+}
+
+/* the four readouts here are the same .aim-stat slots as the aim HUD — they
+   only need the gutter the slot backgrounds now imply. */
+.stream-hud-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.stream-viewers-val { color: var(--views); }
+.stream-earned-val { color: var(--cash); }
+
+.stream-meter-row {
+  display: flex;
+  gap: 10px;
+}
+
+.stream-meter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* V18: the meter track is a recessed slot, so it takes --slot-fill and the
+   1px black outer line like every other well on these screens. */
+.stream-meter-track {
+  height: 12px;
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--outline),
+    0 0 0 1px var(--pixel-black);
+  overflow: hidden;
+}
+
+/* V17 §6: `transition: width .18s linear` removed. width is a LAYOUT property
+   and js/stream.js repaints these every tick of a live session, so the meters
+   were re-laying out the HUD continuously underneath a chat list the player is
+   tapping — the same shape as the max-height bug in HANDOFF §9.5. The fill now
+   cuts to its new value. To get the motion back it must be driven by
+   transform: scaleX() instead — see the JS note in the P4 report. */
+.stream-meter-fill {
+  height: 100%;
+  width: 0%;
+}
+
+.stream-meter-hype { background: linear-gradient(90deg, var(--subs), var(--gold)); }
+.stream-meter-tilt { background: linear-gradient(90deg, var(--elo), var(--danger)); }
+
+.stream-case-slot { min-height: 0; }
+.stream-case-slot:empty { display: none; }
+
+.stream-chat {
+  flex: 1;
+  min-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  position: relative;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 1px var(--slot-border),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* SPEC-V15-BATCH-C §3.1 (owner playtest: toxic messages were "physically
+   hard to hit"): row raised from a ~24px tap target to a ~46-48px one —
+   font-size 12->15, vertical padding 4->11. box-sizing: border-box so the
+   1-2px toxic border is INSIDE that measured height, not extra on top. */
+/* V18 §2.5, with ONE deliberate deviation. Every other list in this package
+   alternates --row-a / --row-b; the chat does NOT. Its rows are added and
+   removed continuously by js/stream.js, so :nth-child() striping would
+   re-stripe every surviving row on each removal — a full-list repaint, several
+   times a second, underneath a finger that is trying to hit one specific line.
+   Colour in this list already carries meaning (role, toxic, hype, resolved),
+   and a shifting zebra would compete with it. So each line gets ONE --row-a
+   pill with the 1px black outer line: the pill is what makes the ~46px tap
+   target visible as a target, which was the actual complaint.
+   The ring is a box-shadow, not a border, so it adds nothing to the
+   border-box height the tap-target sizing below depends on. */
+.chat-line {
+  box-sizing: border-box;
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 11px 12px;
+  border-radius: var(--radius-pixel);
+  background: var(--row-a);
+  box-shadow: 0 0 0 1px var(--pixel-black);
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.chat-user { font-weight: 700; margin-right: 3px; }
+
+.chat-line.role-viewer .chat-user { color: var(--ink-dim); }
+.chat-line.role-sub .chat-user    { color: var(--subs); }
+.chat-line.role-vip .chat-user    { color: var(--gold); }
+.chat-line.role-mod .chat-user    { color: var(--views); }
+
+/* The one line the player must find and tap fast — the brightness strategy
+   applied at row scale: a fully saturated fill in a bounded shape with dark
+   ink, not a glowing outline on a dark field. This is what makes toxic rows
+   the loudest thing in the list without any glow or flash. */
+.chat-line.chat-toxic {
+  background: var(--danger);
+  /* §2.1 — the outer line steps up to TRUE black on chrome. The border stays
+     2px and inside box-sizing: border-box, so the measured tap height is
+     unchanged from the V15 fix. */
+  border: var(--bw) solid var(--pixel-black);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .28),
+    inset 0 -2px 0 rgba(0, 0, 0, .3);
+  color: var(--ink-on-fill);
+}
+.chat-line.chat-toxic .chat-user { color: var(--ink-on-fill); }
+
+.chat-line.chat-hype {
+  background: var(--gold);
+  border: var(--bw) solid var(--pixel-black);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .35),
+    inset 0 -2px 0 rgba(0, 0, 0, .25);
+  color: var(--ink-on-fill);
+}
+.chat-line.chat-hype .chat-user { color: var(--ink-on-fill); }
+
+/* outline (not border): a resolved-state ring that never touches the
+   box-sizing math the toxic row's tap-target height depends on. */
+.chat-line.chat-banned {
+  background: var(--row-b);
+  outline: var(--bw) solid var(--cash);
+  outline-offset: -2px;
+  color: var(--cash);
+}
+
+.chat-line.chat-falseban {
+  background: var(--row-b);
+  outline: var(--bw) solid var(--elo);
+  outline-offset: -2px;
+  color: var(--elo);
+}
+
+/* SPEC-V2 §5b: a moderator auto-bans a share of toxic lines before the
+   player can act on them — visibly flash, then vanish, non-interactive. */
+.chat-line.chat-modbanned {
+  background: color-mix(in srgb, var(--views) 18%, transparent);
+  outline: var(--bw) solid var(--views);
+  pointer-events: none;
+  animation: chatModBanFlash .42s ease-in forwards;
+}
+
+@keyframes chatModBanFlash {
+  0%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+/* SPEC-V15-BATCH-C §3.1 / HANDOFF §9.5: the old version animated
+   max-height (a layout property) alongside opacity/transform, so every
+   removal continuously reflowed every message below it for the whole
+   .22s — that constant reflow is what made the list "jump" and taps miss.
+   This version animates ONLY transform + opacity. The element stays at
+   its full in-flow size for the entire fade (no reflow happens while it
+   is visible/fading) — it slides upward and fades in place, and the one
+   unavoidable layout shift (closing the gap) happens exactly once, at
+   the instant the node is actually removed from the DOM (see
+   js/stream.js removeChatEl(), which additionally defers that removal
+   for as long as any pointer is down anywhere in the chat). */
+.chat-line-gone {
+  animation: chatLineGone .5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes chatLineGone {
+  0%   { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-26px); }
+}
+
+.stream-pop {
+  position: absolute;
+  transform: translate(-50%, 0);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  pointer-events: none;
+  animation: streamPopFloat .7s ease-out forwards;
+}
+
+@keyframes streamPopFloat {
+  0%   { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -26px); }
+}
+
+.stream-hypetrain-banner {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--gold) 80%, transparent), 0 3px 0 var(--outline);
+  pointer-events: none;
+  z-index: 30;
+  animation: hypeTrainBanner 1.6s ease-out forwards;
+}
+
+@keyframes hypeTrainBanner {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.5); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  25%  { transform: translate(-50%, -50%) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1); }
+}
+
+.stream-cash-drop {
+  position: absolute;
+  top: -20px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cash);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--cash) 70%, transparent);
+  pointer-events: none;
+  z-index: 25;
+  animation-name: streamCashFall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes streamCashFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(340px) rotate(40deg); opacity: 0; }
+}
+
+.stream-case-btn {
+  font-size: 11px;
+  background: var(--panel-hi);
+  color: var(--gold);
+}
+
+/* SPEC-V5 §13u: elapsed-time session — OPEN CASE and STOP STREAM sit side by
+   side under the chat instead of the case button spanning full width. */
+.stream-actions {
+  display: flex;
+  gap: 8px;
+}
+.stream-actions .btn {
+  flex: 1;
+  font-size: 11px;
+}
+
+/* V18 §4: the danger ring moved from box-shadow to `outline` on purpose.
+   style.css's ramp now puts the button's hard drop on ITS box-shadow, so any
+   variant that re-declares box-shadow silently deletes the drop and the button
+   goes flat. `outline` states the same red ring without touching that channel
+   — and this variant still sets nothing but colour. */
+.stream-stop-btn {
+  color: var(--danger);
+  outline: var(--bw) solid var(--danger);
+  outline-offset: calc(var(--bw) * -1);
+}
+/* This rule used to be `color: var(--ink-dim)` alone, carrying a comment that
+   claimed it kept the label legible "against that filter". Measured, it did
+   not: through `filter: grayscale(.7) brightness(.6)` the lifted label landed
+   at 3.37:1 on the darkened face, under the 4.5:1 floor — and the filter also
+   pulled the whole key onto its own render surface, so the type was drawn
+   into a texture rather than onto the page.
+
+   V20 §D removed the filter from every disabled control and states the dead
+   face once at the end of css/style.css, at a specificity that reaches this
+   button, so the fill, the ink and the flattened ramp are not restated here.
+   Measured on that face: STOP STREAM's label 7.35:1.
+
+   What IS local is the ring. .stream-stop-btn's live outline is full --danger;
+   a locked one has no business shouting as loud, so the ring is mixed back
+   toward the dead face — present enough to say which key this is, quiet
+   enough to say it is not armed. 70%, not less: that lands the ring at
+   3.01:1 against the face it sits on, and 3:1 is the floor for a non-text
+   element that identifies a control. It was measured down at 1.93:1 first.
+   style.css's `pointer-events: none` still does the actual locking. */
+.stream-stop-btn.btn--disabled {
+  outline-color: color-mix(in srgb, var(--danger) 70%, var(--dead-fill));
+}
+
+/* ==========================================================================
+   FIRST-STREAM TUTORIAL GATE (SPEC-V15-BATCH-C §3.2, owner item §5 first
+   half). js/stream.js inserts one toxic .chat-line + this overlay BEFORE
+   the real session (sess) exists, so no time/viewers/cash accrue while it
+   sits on screen — see startFirstStreamTutorial() there.
+   ========================================================================== */
+.stream-tutorial-overlay {
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--danger),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    0 0 0 1px var(--pixel-black),
+    var(--shadow);
+  transition: opacity .22s ease-in, transform .22s ease-in;
+}
+
+.stream-tutorial-overlay-gone {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.stream-tutorial-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--danger);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.stream-tutorial-body {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.stream-tutorial-cta {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--danger);
+  text-align: center;
+}
+
+/* draws the eye to the one tappable line without moving/resizing it —
+   box-shadow only, so it never fights the "transform+opacity only,
+   never re-layout" rule above (nothing else is on screen to jump anyway). */
+.chat-line.chat-tutorial-target {
+  animation: chatTutorialPulse 1.1s ease-in-out infinite;
+}
+
+/* both keyframes keep the 1px black outer line in the shadow list — otherwise
+   the pulse would strip §2.1's outline off the one row it is drawing to. */
+@keyframes chatTutorialPulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--pixel-black), 0 0 0 1px color-mix(in srgb, var(--danger) 55%, transparent); }
+  50%      { box-shadow: 0 0 0 1px var(--pixel-black), 0 0 0 9px transparent; }
+}
+
+/* ==========================================================================
+   CASE UNBOXING
+   ========================================================================== */
+
+.cases-stats {
+  text-align: center;
+}
+
+.case-art {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px;
+}
+
+/* V18 §4 GRID SLOT — the hero case tile is a square inset slot: --slot-fill
+   well, 1px --slot-border line, the crate sprite floating centred, 1px black
+   outer line. Was a diagonal panel gradient, which read as a card rather than
+   as a slot and did not match the shop/phone tiles. */
+.case-art-box {
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    var(--shadow-lg);
+}
+
+/* Replaces the old Unicode diamond emblem entity — authored SVG crate
+   icon now lives directly inside .case-art-box (js/cases.js ICON_CRATE). */
+.case-art-box svg {
+  width: 44px;
+  height: 44px;
+  color: var(--gold);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--gold) 45%, transparent));
+}
+
+.case-art-name {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+.case-art-price {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cash);
+}
+
+.case-art-energy {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--energy);
+}
+
+.case-strip-slot:empty,
+.case-result-slot:empty { display: none; }
+
+/* The roulette is a carved window the strip runs behind — so it takes the slot
+   well colour and the 1px black outer line. Height stays fixed (84px): this is
+   the one place a fixed height is correct, because the strip is absolutely
+   positioned inside it. */
+.case-roulette {
+  position: relative;
+  height: 84px;
+  overflow: hidden;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 1px var(--slot-border),
+    var(--shadow);
+}
+
+.case-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  height: 100%;
+  will-change: transform;
+}
+
+.case-strip-done .case-tile-winner {
+  animation: caseWinnerPulse 1s ease-in-out infinite;
+}
+
+/* keeps the thick --slot-sel selection ring present in BOTH keyframes — the
+   old pulse replaced box-shadow outright and so blinked the selected-slot
+   edge off half the time. */
+@keyframes caseWinnerPulse {
+  0%, 100% { box-shadow: inset 0 0 0 3px var(--slot-sel), inset 0 0 6px rgba(255, 255, 255, .25); }
+  50%      { box-shadow: inset 0 0 0 3px var(--slot-sel), inset 0 0 18px rgba(255, 255, 255, .55); }
+}
+
+.case-marker {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ink);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ink) 80%, transparent);
+  transform: translateX(-1px);
+  z-index: 5;
+}
+.case-marker::before,
+.case-marker::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  transform: translateX(-50%);
+}
+.case-marker::before { top: -1px; border-top: 7px solid var(--ink); }
+.case-marker::after   { bottom: -1px; border-bottom: 7px solid var(--ink); }
+
+.case-tile {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 3px 0;
+  /* §2.1 — the divider between roulette tiles is the same TRUE black as every
+     other chrome edge, so the strip reads as a row of discrete slots. */
+  border-right: var(--bw) solid var(--pixel-black);
+  background: var(--panel);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* V22 (owner item 2) — the skin's 16x16 sprite, drawn by js/cases.js.
+   image-rendering: pixelated keeps the 3x upscale hard-edged; without it the
+   browser bilinearly smooths the tile into mush, which is the same defect
+   css/style.css's .pixicon block guards against with shape-rendering.
+   The canvas is 48x48 (16 * 3) so every source pixel maps to a whole 3x3
+   block — a fractional scale is what makes pixel art shimmer as it moves, and
+   this strip is moving fast. width/height are capped rather than fixed so a
+   narrow tile (the 44px stream strip) shrinks the sprite instead of clipping. */
+.case-tile-sprite {
+  width: 100%;
+  max-width: 34px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.case-tile-weapon {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  color: var(--ink);
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-tile-skin {
+  font-size: 8px;
+  color: var(--ink-dim);
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Solid saturated footer band, not a soft glow — the rarity colour reads as
+   an object (a coloured strip mounted on the tile) rather than an aura. */
+.case-tile-bar {
+  margin-top: auto;
+  width: 100%;
+  height: 6px;
+  flex: 0 0 auto;
+  background: var(--tile-accent, var(--border));
+  border-top: 1px solid var(--pixel-black);
+}
+
+/* These five were hand-copied rgba() duplicates of the --r-* rarity tokens —
+   the same literals the tokens file owns, just spelled in a way the raw-hex
+   grep can't see. Derived from the tokens now, so a rarity recolour lands
+   here for free. */
+.case-tile-milspec    { background: color-mix(in srgb, var(--r-milspec) 14%, transparent); }
+.case-tile-restricted { background: color-mix(in srgb, var(--r-restricted) 16%, transparent); }
+.case-tile-classified { background: color-mix(in srgb, var(--r-classified) 18%, transparent); }
+.case-tile-covert     { background: color-mix(in srgb, var(--r-covert) 20%, transparent); }
+.case-tile-rare       { background: color-mix(in srgb, var(--r-rare) 22%, transparent); }
+
+/* §4 SELECTED SLOT — the landed tile is the selected slot in this grid, so it
+   swaps its edge for the thick yellow --slot-sel rather than the near-black
+   ring it used to get (which was indistinguishable from its neighbours).
+   SCOPED TO .case-strip-done ON PURPOSE: unscoped, the winning tile wore its
+   yellow ring and lifted background from the moment the strip was built, so a
+   player could read the result off the blur long before the wheel settled —
+   the spin had no suspense left. The strip only earns its selection ring once
+   playRoulette() has stopped and added .case-strip-done. Both entry points
+   (the CASES screen and the on-stream open) go through that same function, so
+   this one scope covers both. */
+.case-strip-done .case-tile-winner {
+  background: var(--panel-hi);
+  box-shadow: inset 0 0 0 3px var(--slot-sel);
+}
+
+.case-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0;
+  animation: caseFlash .5s ease-out forwards;
+}
+
+@keyframes caseFlash {
+  0%   { opacity: 0; }
+  10%  { opacity: .85; }
+  100% { opacity: 0; }
+}
+
+.case-reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  text-align: center;
+  animation: caseRevealIn .28s ease-out;
+}
+
+@keyframes caseRevealIn {
+  0%   { opacity: 0; transform: translateY(8px) scale(.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.case-reveal-rarity {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.case-reveal-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.case-reveal-meta {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+/* SPEC-V2 §10: auto-sell reveal — no SELL/DISPLAY choice, just the result. */
+.case-reveal-sold {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 4px;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.case-reveal-net {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-dim);
+}
+
+.case-net-pos { color: var(--cash); }
+.case-net-neg { color: var(--danger); }
+
+/* fills the leftover vertical space below OPEN CASE with a useful
+   reference table instead of a dead empty region */
+/* Owner playtest: "the drop odds for a case are a very slim scrollable thing
+   that just looks awful. Make it bigger, non-scrollable."
+
+   ROOT CAUSE: `flex: 1 1 auto` + `min-height: 0` let this panel be squeezed
+   down to whatever space the column had left over, and `overflow-y: auto` then
+   turned that sliver into its OWN scroll container — so the odds table hid
+   inside a ~40px window while the page around it stayed fixed.
+
+   Now `flex: 0 0 auto` with no overflow: the panel always takes its full
+   natural height and shows every rarity row at once. The height it adds is
+   absorbed by the PAGE scrolling instead, which `.cases-wrap`'s
+   `min-height: 100%` (see the scroll fix above) is what makes possible. */
+/* V18 §2.5 — the odds table becomes a real stacked-pill list: rows run edge to
+   edge inside the panel, alternate --row-a / --row-b, and are separated by a
+   1px --row-divider instead of the dashed --border hairline. Swatch + label
+   hard LEFT, percentage hard RIGHT. `overflow: hidden` clips the rows to the
+   panel's radius so the block stays one framed object.
+   The flex/height reasoning above is untouched — still `flex: 0 0 auto` with
+   no internal overflow, so the panel keeps its full natural height and the
+   PAGE scrolls (see .cases-wrap). */
+.case-odds {
+  flex: 0 0 auto;
+  padding: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+}
+
+.case-odds-title {
+  letter-spacing: 1.5px;
+  margin: 0 14px 10px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+/* Rows scaled up along with the panel — at 11px in a squeezed strip these
+   were the least readable text in the game. */
+.case-odds-row {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  padding: 9px 14px;
+  background: var(--row-a);
+  border-bottom: 1px solid var(--row-divider);
+}
+/* the title is child 1, so the rows start on an even index — the parity is
+   offset by one but still alternates, which is all this needs. */
+.case-odds-row:nth-child(odd) { background: var(--row-b); }
+.case-odds-row:last-child { border-bottom: none; }
+
+/* Chunky outlined chip instead of a glow dot — matches the tile-bar
+   treatment above so rarity always reads the same way across the screen. */
+.case-odds-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pixel);
+  background: currentColor;
+  border: 1px solid var(--pixel-black);
+}
+
+.case-odds-label { font-weight: 700; letter-spacing: .5px; }
+.case-odds-range { color: var(--ink-dim); font-size: 10px; }
+/* SPEC-V3 §11: the gold row's value is a deliberate mystery — style the '?'
+   distinctly but never attach the real range anywhere (no title/data-*). */
+.case-odds-range-hidden {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+/* §2.5's hard-right number, in §2.6's warm number colour (15.0:1 on --row-a,
+   15.9:1 on --row-b). */
+.case-odds-pct { font-weight: 700; color: var(--num-warm); font-variant-numeric: tabular-nums; min-width: 46px; text-align: right; }
+
+/* ==========================================================================
+   SPEC-V15 §10 — case TIER SELECTOR (three tiles: STANDARD/PRIME/ELITE).
+   Two independent picks per tile (SOLO / ON STREAM) so which case opens in
+   which context is always explicit, never a single toggle to infer.
+   V16: tokens.css now ships real --outline / --bevel-hi / --bevel-lo — the
+   var(--bg-space) stand-in below is retired in favour of those.
+   ========================================================================== */
+/* SCROLL FIX (owner playtest: "you can't scroll down, the case opening
+   animation wheel is too low ... not everything fits").
+
+   ROOT CAUSE: `.screen` is already `overflow-y: auto`, so the screen CAN
+   scroll — but `.mg-wrap` sets `height: 100%`, which pins this content to
+   exactly the viewport height. Content then overflows INSIDE a fixed-height
+   box instead of growing it, so the scroll container never has anything to
+   scroll to and everything past the fold is simply unreachable.
+
+   `min-height` instead of `height` keeps the wrap filling the screen when the
+   content is short, while letting it grow when the content is tall — which is
+   what actually arms `.screen`'s overflow-y.
+
+   Scoped to `.cases-wrap`, NOT `.mg-wrap`: the aim trainer and the stream
+   minigame share that class and genuinely need a fixed-height play area (their
+   canvas / chat column size off it). Changing the shared class would have
+   silently broken both. */
+.cases-wrap {
+  height: auto;
+  min-height: 100%;
+}
+
+/* The tier picker now sits at the BOTTOM of the page (js/cases.js reorders the
+   markup), so it needs breathing room above it and clearance below the last
+   card rather than sitting flush against the odds panel. */
+.case-tier-list {
+  margin-top: 4px;
+  padding-bottom: 4px;
+}
+
+.case-tier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.case-tier {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+}
+
+/* §4 SELECTED SLOT — a chosen tier now carries a THICK 3px selection ring
+   instead of the 2px --bw hairline, which is the difference between "this
+   card has a coloured edge" and "this card is the one that is picked".
+   --slot-sel-alt (green) is solo, --slot-sel (yellow) is both-contexts; the
+   stream-only ring stays --subs because that pink is what marks stream/subs
+   everywhere else in the game and V18 ships no third selection token. */
+.case-tier--solo   { box-shadow: inset 0 0 0 3px var(--slot-sel-alt), inset 0 var(--bw) 0 var(--bevel-hi), inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo), var(--shadow); }
+.case-tier--stream { box-shadow: inset 0 0 0 3px var(--subs), inset 0 var(--bw) 0 var(--bevel-hi), inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo), var(--shadow); }
+.case-tier--solo.case-tier--stream {
+  box-shadow: inset 0 0 0 3px var(--slot-sel), inset 0 var(--bw) 0 var(--bevel-hi), inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo), var(--shadow);
+}
+
+.case-tier--locked { opacity: .78; }
+
+.case-tier__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.case-tier__label { font-size: 12.5px; font-weight: 700; letter-spacing: .5px; color: var(--ink-head); text-shadow: var(--text-outline); }
+.case-tier__cost { font-size: 13px; font-weight: 700; color: var(--cash); }
+
+.case-tier__range { font-size: 10px; color: var(--ink-dim); letter-spacing: .2px; }
+
+.case-tier__lock {
+  align-self: flex-start;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-on-fill);
+  background: var(--danger);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  padding: 2px 6px;
+}
+
+.case-tier__picks { display: flex; gap: 6px; margin-top: 2px; }
+.case-tier__pick {
+  flex: 1 1 0;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-dim);
+  background: var(--panel-lo);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo);
+  padding: 7px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .04s linear;
+}
+.case-tier__pick:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-lo),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-hi);
+}
+/* §4 — an active pick is a selected slot: the yellow --slot-sel fill. */
+.case-tier__pick--active {
+  color: var(--ink-on-fill);
+  background: var(--slot-sel);
+  box-shadow:
+    inset 0 var(--bw) 0 rgba(255, 255, 255, .55),
+    inset 0 calc(var(--bw) * -1) 0 rgba(0, 0, 0, .35);
+}
+.case-tier__pick-icon { width: 11px; height: 11px; flex: 0 0 auto; }
+
+.case-art-stream {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  color: var(--subs);
+  margin-top: 2px;
+}

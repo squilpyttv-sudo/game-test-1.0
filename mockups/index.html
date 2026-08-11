@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>[OUTDATED V1] CS2 PRO SIMULATOR — Mockup Gallery</title>
+<link rel="stylesheet" href="mockups.css">
+</head>
+<body>
+
+<!-- ========================================================================
+     STALE NOTICE (TASKS-REMAINING #6)
+     Styles are inline on purpose: this banner must survive even if
+     mockups.css is edited or dropped, and it must not add colours to a
+     stylesheet. The tokens-only rule covers css/*.css, which this is not.
+     ======================================================================== -->
+<aside role="note" style="
+  margin: 0; padding: 14px 18px;
+  background: #2a1d05; color: #ffd98a;
+  border-bottom: 3px solid #ffb020;
+  font: 700 13px/1.55 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: .3px;">
+  <strong style="display:block; font-size:14px; letter-spacing:1px; color:#ffb020; margin-bottom:6px;">
+    OUTDATED — THIS IS THE V1 DESIGN, KEPT ONLY AS HISTORY
+  </strong>
+  These mockups are three major redesigns behind the game and do
+  <strong>not</strong> show the title screen, locations, staff, the phone, room
+  customisation, or any of the V16/V18 pixel-UI work. Do not treat anything here
+  as the current visual target.
+  <span style="display:block; margin-top:6px; color:#e8c98d; font-weight:400;">
+    The real art rules live in <code style="color:#ffd98a">ART-DIRECTION.md</code>;
+    the current design is whatever <code style="color:#ffd98a">index.html</code> at
+    the project root actually renders. Regenerating this gallery is
+    <code style="color:#ffd98a">TASKS-REMAINING.md</code> item 6.
+  </span>
+</aside>
+
+<header class="gallery-header">
+  <div class="gallery-eyebrow">Visual Target — High-Fidelity Mockups</div>
+  <h1 class="gallery-title">CS2 PRO <span class="accent">SIMULATOR</span></h1>
+  <p class="gallery-sub">
+    Six screens at 420×860, rendered to the spec: chunky pixel UI, hard drop shadows,
+    monospace everything, and a hand-built isometric room engine (shaded cuboids,
+    2:1 projection, painter's-algorithm sort) driving the hub art. Static presentation only —
+    no game logic, no save state.
+  </p>
+</header>
+
+<!-- ========================================================================
+     SIX SCREENS
+     ======================================================================== -->
+<section class="section-heading"><h2>01 — The Six Screens</h2><div class="rule"></div><span class="num">420×860</span></section>
+
+<div class="mock-grid">
+
+  <!-- ===================== 1. HUB ===================== -->
+  <figure class="mock">
+    <div class="frame-head"><span class="frame-index">01</span><span class="frame-title">Hub</span></div>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="topbar">
+          <div class="tb-rank">
+            <div class="tb-rank-chip" style="background:#4b69ff33;color:#4b69ff;border-color:#4b69ff">DM</div>
+            <div class="tb-rank-info">
+              <div class="tb-rank-name">DMG</div>
+              <div class="tb-elo-bar"><div class="tb-elo-fill" style="width:17%;background:#4b69ff"></div></div>
+            </div>
+          </div>
+          <div class="tb-stats">
+            <div class="tb-stat cash"><span class="v">$1.24K</span><span class="l">CASH</span></div>
+            <div class="tb-stat subs"><span class="v">3.2K</span><span class="l">FANS</span></div>
+            <div class="tb-stat views"><span class="v">812</span><span class="l">PEAK</span></div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-day">DAY 14</div>
+            <div class="tb-energy-bar"><div class="tb-energy-fill" style="width:65%"></div></div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <canvas class="room-canvas" id="canvas-hub" width="420" height="706"></canvas>
+
+          <div class="float-money" style="left:118px; top:330px; animation-delay:0s;">+$4</div>
+          <div class="float-money" style="left:190px; top:300px; animation-delay:.9s;">+$12</div>
+          <div class="float-money" style="left:150px; top:360px; animation-delay:1.7s;">+$3</div>
+
+          <div class="hub-prop-tag" style="left:210px; top:250px;">
+            <div class="t">RGB Rig · PC</div>
+            <div class="s">+8 income/day</div>
+          </div>
+
+          <div class="hub-actions">
+            <div class="btn ghost">CAREER</div>
+            <div class="btn gold">END DAY</div>
+          </div>
+        </div>
+
+        <div class="bottomnav">
+          <div class="nav-btn play"><span class="ic"></span>PLAY</div>
+          <div class="nav-btn train"><span class="ic"></span>TRAIN</div>
+          <div class="nav-btn stream"><span class="ic"></span>STREAM</div>
+          <div class="nav-btn cases"><span class="ic"></span>CASES</div>
+          <div class="nav-btn shop"><span class="ic"></span>SHOP</div>
+        </div>
+      </div>
+    </div>
+    <p class="frame-caption">
+      <span class="tag">Centerpiece</span>
+      The isometric bedroom is drawn live on canvas — desk, dual monitors with a soft additive
+      glow, RGB tower, gaming chair, bed and a display case, sorted back-to-front. Floating
+      <b>+$</b> numbers drift off income props; tapping one would surface the prop-info chip shown
+      here. <b>CAREER</b> and <b>END DAY</b> live in the hub itself, per spec, separate from the main nav.
+    </p>
+  </figure>
+
+  <!-- ===================== 2. AIM TRAINER ===================== -->
+  <figure class="mock">
+    <div class="frame-head"><span class="frame-index">02</span><span class="frame-title">Aim Trainer</span></div>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="topbar">
+          <div class="tb-rank">
+            <div class="tb-rank-chip" style="background:#4b69ff33;color:#4b69ff;border-color:#4b69ff">DM</div>
+            <div class="tb-rank-info">
+              <div class="tb-rank-name">DMG</div>
+              <div class="tb-elo-bar"><div class="tb-elo-fill" style="width:17%;background:#4b69ff"></div></div>
+            </div>
+          </div>
+          <div class="tb-stats">
+            <div class="tb-stat cash"><span class="v">$1.24K</span><span class="l">CASH</span></div>
+            <div class="tb-stat subs"><span class="v">3.2K</span><span class="l">FANS</span></div>
+            <div class="tb-stat views"><span class="v">812</span><span class="l">PEAK</span></div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-day">DAY 14</div>
+            <div class="tb-energy-bar"><div class="tb-energy-fill" style="width:55%"></div></div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <div class="aim-bg"></div>
+          <div class="aim-vignette"></div>
+
+          <div class="aim-hud">
+            <div class="aim-chip timer"><span class="v">0:42</span><span class="l">TIME LEFT</span></div>
+            <div class="aim-chip acc"><span class="v">87%</span><span class="l">ACCURACY</span></div>
+            <div class="aim-chip combo"><span class="v">×14</span><span class="l">COMBO</span></div>
+          </div>
+
+          <div class="aim-ring" style="left:70px; top:170px; width:64px; height:64px;"></div>
+          <div class="aim-target red" style="left:74px; top:174px; width:56px; height:56px;"></div>
+
+          <div class="aim-ring" style="left:270px; top:230px; width:46px; height:46px;"></div>
+          <div class="aim-target blue" style="left:273px; top:233px; width:40px; height:40px;"></div>
+
+          <div class="aim-target gold pop" style="left:170px; top:340px; width:64px; height:64px;"></div>
+          <div class="aim-hit-fx" style="left:202px; top:372px;"></div>
+
+          <div class="aim-ring" style="left:110px; top:430px; width:36px; height:36px;"></div>
+          <div class="aim-target blue" style="left:112px; top:432px; width:32px; height:32px;"></div>
+
+          <div class="aim-ring" style="left:250px; top:410px; width:52px; height:52px;"></div>
+          <div class="aim-target red" style="left:253px; top:413px; width:46px; height:46px;"></div>
+
+          <div class="aim-crosshair" style="left:230px; top:300px;"></div>
+
+          <div class="aim-session-label">Precision Drill · AWP Flicks · Grade preview: A</div>
+        </div>
+
+        <div class="bottomnav">
+          <div class="nav-btn play"><span class="ic"></span>PLAY</div>
+          <div class="nav-btn train active"><span class="ic"></span>TRAIN</div>
+          <div class="nav-btn stream"><span class="ic"></span>STREAM</div>
+          <div class="nav-btn cases"><span class="ic"></span>CASES</div>
+          <div class="nav-btn shop"><span class="ic"></span>SHOP</div>
+        </div>
+      </div>
+    </div>
+    <p class="frame-caption">
+      <span class="tag">Mid-session</span>
+      Shrinking dashed rings telegraph each target's despawn; a gold target mid-pop shows the
+      hit-confirm burst. Live <b>ACCURACY</b> and <b>COMBO</b> chips keep the dopamine loop legible at a
+      glance — combo color escalates to gold as the run heats up, feeding directly into the
+      day's Grade → <code>M_form</code> multiplier.
+    </p>
+  </figure>
+
+  <!-- ===================== 3. STREAM MODE ===================== -->
+  <figure class="mock">
+    <div class="frame-head"><span class="frame-index">03</span><span class="frame-title">Stream Mode</span></div>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="topbar">
+          <div class="tb-rank">
+            <div class="tb-rank-chip" style="background:#4b69ff33;color:#4b69ff;border-color:#4b69ff">DM</div>
+            <div class="tb-rank-info">
+              <div class="tb-rank-name">DMG</div>
+              <div class="tb-elo-bar"><div class="tb-elo-fill" style="width:17%;background:#4b69ff"></div></div>
+            </div>
+          </div>
+          <div class="tb-stats">
+            <div class="tb-stat cash"><span class="v">$1.31K</span><span class="l">CASH</span></div>
+            <div class="tb-stat subs"><span class="v">3.2K</span><span class="l">FANS</span></div>
+            <div class="tb-stat views"><span class="v">812</span><span class="l">PEAK</span></div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-day">0:31 LEFT</div>
+            <div class="tb-energy-bar"><div class="tb-energy-fill" style="width:35%"></div></div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <div class="stream-content">
+            <div class="stream-topinfo">
+              <div class="stream-viewers"><span class="dot"></span>12,406 WATCHING</div>
+              <div class="stream-webcam"><span class="live">LIVE</span><span class="face"></span></div>
+            </div>
+
+            <div class="stream-meters">
+              <div class="meter">
+                <div class="l"><span>HYPE</span><span>92/100</span></div>
+                <div class="meter-bar hype"><div class="fill" style="width:92%"></div></div>
+              </div>
+              <div class="meter">
+                <div class="l"><span>TILT</span><span>34/100</span></div>
+                <div class="meter-bar tilt"><div class="fill" style="width:34%"></div></div>
+              </div>
+            </div>
+
+            <div class="chat-wrap">
+              <div class="chat-line"><span class="u hype">n0va_fan:</span>LETS GOOO HYPE TRAIN SOON</div>
+              <div class="chat-line toxic"><span class="u">xX_ragebait_Xx:</span>uninstall the game bro ur washed<span class="tag">BANNED</span></div>
+              <div class="chat-line"><span class="u sub">kayleigh.cs:</span>!drop pls 🙏</div>
+              <div class="chat-line"><span class="u mod">mod_pingu:</span>chat calm down, follow the rules</div>
+              <div class="chat-line"><span class="u">viewer_2281:</span>that awp flick was nuts</div>
+              <div class="chat-line toxic banned"><span class="u">salt_miner99:</span>ez clap trash stream<span class="tag">BANNED</span></div>
+              <div class="chat-line"><span class="u hype">clutch_or_kick:</span>POGGERS combo x14 on aim rn</div>
+              <div class="chat-line"><span class="u">bhop_enjoyer:</span>can u open a case on stream</div>
+              <div class="chat-line"><span class="u sub">tier1_dreamer:</span>subbed! keep grinding king</div>
+            </div>
+
+            <div class="stream-actions">
+              <div class="btn gold">OPEN CASE ON STREAM</div>
+              <div class="btn danger" style="flex:0 0 84px;">BAN</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottomnav">
+          <div class="nav-btn play"><span class="ic"></span>PLAY</div>
+          <div class="nav-btn train"><span class="ic"></span>TRAIN</div>
+          <div class="nav-btn stream active"><span class="ic"></span>STREAM</div>
+          <div class="nav-btn cases"><span class="ic"></span>CASES</div>
+          <div class="nav-btn shop"><span class="ic"></span>SHOP</div>
+        </div>
+      </div>
+    </div>
+    <p class="frame-caption">
+      <span class="tag">Live moderation</span>
+      Chat scrolls upward with ~15% toxic lines in red; two are mid-ban here (one strike-through,
+      one still tappable). <b>HYPE</b> is one tap from a Sub Hype Train; <b>TILT</b> is climbing but
+      safe. <b>OPEN CASE ON STREAM</b> stays live the whole session for the 10× viewer-multiplier synergy.
+    </p>
+  </figure>
+
+  <!-- ===================== 4. CASE UNBOXING ===================== -->
+  <figure class="mock">
+    <div class="frame-head"><span class="frame-index">04</span><span class="frame-title">Case Unboxing</span></div>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="topbar">
+          <div class="tb-rank">
+            <div class="tb-rank-chip" style="background:#4b69ff33;color:#4b69ff;border-color:#4b69ff">DM</div>
+            <div class="tb-rank-info">
+              <div class="tb-rank-name">DMG</div>
+              <div class="tb-elo-bar"><div class="tb-elo-fill" style="width:17%;background:#4b69ff"></div></div>
+            </div>
+          </div>
+          <div class="tb-stats">
+            <div class="tb-stat cash"><span class="v">$1.19K</span><span class="l">CASH</span></div>
+            <div class="tb-stat subs"><span class="v">3.2K</span><span class="l">FANS</span></div>
+            <div class="tb-stat views"><span class="v">812</span><span class="l">PEAK</span></div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-day">DAY 14</div>
+            <div class="tb-energy-bar"><div class="tb-energy-fill" style="width:65%"></div></div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <div class="cases-content">
+            <div class="case-header">
+              <div class="name">Nebula Case</div>
+              <div class="sub">Opened 128 times today · authentic CS odds</div>
+            </div>
+            <div class="case-art"></div>
+
+            <div class="roulette">
+              <div class="roulette-marker"></div>
+              <div class="roulette-track">
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">P250 | Sand</div></div>
+                <div class="r-tile restricted blur"><div class="icon" style="background:#8847ff"></div><div class="name">MP7 | Neon</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">MAC-10 | Grit</div></div>
+                <div class="r-tile classified blur"><div class="icon" style="background:#d32ce6"></div><div class="name">AWP | Riptide</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">Glock | Circuit</div></div>
+                <div class="r-tile rare"><div class="icon" style="background:#ffd700"></div><div class="name">★ Karambit | Aurora</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">UMP | Rust</div></div>
+                <div class="r-tile restricted"><div class="icon" style="background:#8847ff"></div><div class="name">M4A4 | Circuit</div></div>
+                <div class="r-tile covert blur"><div class="icon" style="background:#eb4b4b"></div><div class="name">AK-47 | Bloodrun</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">Tec-9 | Ash</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">P250 | Sand</div></div>
+                <div class="r-tile restricted blur"><div class="icon" style="background:#8847ff"></div><div class="name">MP7 | Neon</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">MAC-10 | Grit</div></div>
+                <div class="r-tile classified blur"><div class="icon" style="background:#d32ce6"></div><div class="name">AWP | Riptide</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">Glock | Circuit</div></div>
+                <div class="r-tile rare"><div class="icon" style="background:#ffd700"></div><div class="name">★ Karambit | Aurora</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">UMP | Rust</div></div>
+                <div class="r-tile restricted"><div class="icon" style="background:#8847ff"></div><div class="name">M4A4 | Circuit</div></div>
+                <div class="r-tile covert blur"><div class="icon" style="background:#eb4b4b"></div><div class="name">AK-47 | Bloodrun</div></div>
+                <div class="r-tile milspec"><div class="icon" style="background:#4b69ff"></div><div class="name">Tec-9 | Ash</div></div>
+              </div>
+            </div>
+
+            <div class="case-cta">
+              <div class="btn gold" style="opacity:.55;">SPINNING…</div>
+              <div class="case-price">COST $2.50</div>
+            </div>
+
+            <div class="case-odds">
+              <div class="o milspec"><span class="p">79.92%</span>MIL-SPEC</div>
+              <div class="o restricted"><span class="p">15.98%</span>RESTRICTED</div>
+              <div class="o classified"><span class="p">3.20%</span>CLASSIFIED</div>
+              <div class="o covert"><span class="p">0.64%</span>COVERT</div>
+              <div class="o rare"><span class="p">0.26%</span>RARE ★</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottomnav">
+          <div class="nav-btn play"><span class="ic"></span>PLAY</div>
+          <div class="nav-btn train"><span class="ic"></span>TRAIN</div>
+          <div class="nav-btn stream"><span class="ic"></span>STREAM</div>
+          <div class="nav-btn cases active"><span class="ic"></span>CASES</div>
+          <div class="nav-btn shop"><span class="ic"></span>SHOP</div>
+        </div>
+      </div>
+    </div>
+    <p class="frame-caption">
+      <span class="tag">Retention hook</span>
+      A gold-bordered <b>★ Karambit | Aurora</b> tile glows as it nears the center marker; the two
+      neighboring rarer tiles carry a motion-blur treatment to sell strip speed. Odds match the
+      authentic CS breakdown exactly, always visible below the spin so the pull never feels rigged.
+    </p>
+  </figure>
+
+  <!-- ===================== 5. SHOP ===================== -->
+  <figure class="mock">
+    <div class="frame-head"><span class="frame-index">05</span><span class="frame-title">Shop</span></div>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="topbar">
+          <div class="tb-rank">
+            <div class="tb-rank-chip" style="background:#4b69ff33;color:#4b69ff;border-color:#4b69ff">DM</div>
+            <div class="tb-rank-info">
+              <div class="tb-rank-name">DMG</div>
+              <div class="tb-elo-bar"><div class="tb-elo-fill" style="width:17%;background:#4b69ff"></div></div>
+            </div>
+          </div>
+          <div class="tb-stats">
+            <div class="tb-stat cash"><span class="v">$1.24K</span><span class="l">CASH</span></div>
+            <div class="tb-stat subs"><span class="v">3.2K</span><span class="l">FANS</span></div>
+            <div class="tb-stat views"><span class="v">812</span><span class="l">PEAK</span></div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-day">DAY 14</div>
+            <div class="tb-energy-bar"><div class="tb-energy-fill" style="width:65%"></div></div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <div class="shop-content">
+            <div class="shop-tabs">
+              <div class="shop-tab active">DESK</div>
+              <div class="shop-tab">PC</div>
+              <div class="shop-tab">CHAIR</div>
+              <div class="shop-tab">DECOR</div>
+              <div class="shop-tab">ROOM</div>
+            </div>
+            <div class="shop-cash-row"><span>BALANCE</span><span class="v">$1,240</span></div>
+
+            <div class="shop-grid">
+
+              <div class="shop-card owned">
+                <div class="icon-wrap"><canvas id="icon-desk0" width="72" height="64"></canvas></div>
+                <div class="band">Starter</div>
+                <div class="name">IKEA Grind Desk</div>
+                <div class="stats"><span class="stat-chip income">INCOME +2</span></div>
+                <div class="price">$45</div>
+              </div>
+
+              <div class="shop-card">
+                <div class="icon-wrap"><canvas id="icon-desk" width="72" height="64"></canvas></div>
+                <div class="band">Pro</div>
+                <div class="name">RGB Battlestation Desk</div>
+                <div class="stats"><span class="stat-chip income">INCOME +8</span><span class="stat-chip prestige">PRESTIGE +3</span></div>
+                <div class="price">$850</div>
+              </div>
+
+              <div class="shop-card">
+                <div class="icon-wrap"><canvas id="icon-pc" width="72" height="64"></canvas></div>
+                <div class="band">Elite</div>
+                <div class="name">Liquid-Cooled Elite Rig</div>
+                <div class="stats"><span class="stat-chip aim">AIM +12</span><span class="stat-chip luck">LUCK +.05</span></div>
+                <div class="price">$9,800</div>
+                <div class="lock-overlay"><span class="lock-icon">🔒</span>NEEDS $9,800</div>
+              </div>
+
+              <div class="shop-card">
+                <div class="icon-wrap"><canvas id="icon-chair" width="72" height="64"></canvas></div>
+                <div class="band">Pro</div>
+                <div class="name">Elite Gaming Throne</div>
+                <div class="stats"><span class="stat-chip aim">AIM +6</span><span class="stat-chip stream">STREAM +4</span></div>
+                <div class="price">$3,500</div>
+                <div class="lock-overlay"><span class="lock-icon">🔒</span>NEEDS $3,500</div>
+              </div>
+
+              <div class="shop-card owned">
+                <div class="icon-wrap"><canvas id="icon-plant" width="72" height="64"></canvas></div>
+                <div class="band">Starter</div>
+                <div class="name">Potted Monstera</div>
+                <div class="stats"><span class="stat-chip prestige">PRESTIGE +1</span></div>
+                <div class="price">$60</div>
+              </div>
+
+              <div class="shop-card">
+                <div class="icon-wrap"><canvas id="icon-case" width="72" height="64"></canvas></div>
+                <div class="band">Pro</div>
+                <div class="name">Covert Display Rack</div>
+                <div class="stats"><span class="stat-chip prestige">PRESTIGE +15</span><span class="stat-chip luck">LUCK +.03</span></div>
+                <div class="price">$2,000</div>
+                <div class="lock-overlay"><span class="lock-icon">🔒</span>PULL A COVERT FIRST</div>
+              </div>
+
+              <div class="shop-card">
+                <div class="icon-wrap"><canvas id="icon-room" width="72" height="64"></canvas></div>
+                <div class="band">Pro</div>
+                <div class="name">Team Trophy Wall</div>
+                <div class="stats"><span class="stat-chip prestige">PRESTIGE +10</span></div>
+                <div class="price">$1,200</div>
+                <div class="lock-overlay"><span class="lock-icon">🔒</span>NEEDS ROOM TIER 2</div>
+              </div>
+
+              <div class="shop-card">
+                <div class="icon-wrap"><canvas id="icon-house" width="72" height="64"></canvas></div>
+                <div class="band">Elite</div>
+                <div class="name">Gaming Mansion Deed</div>
+                <div class="stats"><span class="stat-chip income">INCOME +25</span><span class="stat-chip prestige">PRESTIGE +40</span></div>
+                <div class="price">$50,000</div>
+                <div class="lock-overlay"><span class="lock-icon">🔒</span>LONG-TERM GOAL</div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <div class="bottomnav">
+          <div class="nav-btn play"><span class="ic"></span>PLAY</div>
+          <div class="nav-btn train"><span class="ic"></span>TRAIN</div>
+          <div class="nav-btn stream"><span class="ic"></span>STREAM</div>
+          <div class="nav-btn cases"><span class="ic"></span>CASES</div>
+          <div class="nav-btn shop active"><span class="ic"></span>SHOP</div>
+        </div>
+      </div>
+    </div>
+    <p class="frame-caption">
+      <span class="tag">Room slots</span>
+      Each mini-icon is the same iso engine rendering a single prop. Owned items carry a green
+      <b>OWNED</b> ribbon; unaffordable or requirement-gated items desaturate under a lock overlay
+      that states the exact blocker — cash, room tier, or a rare pull — never a vague "locked."
+    </p>
+  </figure>
+
+  <!-- ===================== 6. CAREER ===================== -->
+  <figure class="mock">
+    <div class="frame-head"><span class="frame-index">06</span><span class="frame-title">Career</span></div>
+    <div class="phone-frame">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="topbar">
+          <div class="tb-rank">
+            <div class="tb-rank-chip" style="background:#4b69ff33;color:#4b69ff;border-color:#4b69ff">DM</div>
+            <div class="tb-rank-info">
+              <div class="tb-rank-name">DMG</div>
+              <div class="tb-elo-bar"><div class="tb-elo-fill" style="width:17%;background:#4b69ff"></div></div>
+            </div>
+          </div>
+          <div class="tb-stats">
+            <div class="tb-stat cash"><span class="v">$1.24K</span><span class="l">CASH</span></div>
+            <div class="tb-stat subs"><span class="v">3.2K</span><span class="l">FANS</span></div>
+            <div class="tb-stat views"><span class="v">812</span><span class="l">PEAK</span></div>
+          </div>
+          <div class="tb-right">
+            <div class="tb-day">DAY 14</div>
+            <div class="tb-energy-bar"><div class="tb-energy-fill" style="width:65%"></div></div>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <div class="career-content">
+            <div class="career-header"><h3>Rank Ladder</h3></div>
+
+            <div class="rank-ladder">
+              <div class="rank-row past"><span class="chip" style="background:#9aa4b8"></span><div class="info"><span class="name">Silver</span><span class="thresh">0 ELO</span></div></div>
+              <div class="rank-row past"><span class="chip" style="background:#d9a441"></span><div class="info"><span class="name">Gold Nova</span><span class="thresh">250 ELO</span></div></div>
+              <div class="rank-row past"><span class="chip" style="background:#59b3d9"></span><div class="info"><span class="name">Master Guardian</span><span class="thresh">500 ELO</span></div></div>
+              <div class="rank-row current"><span class="chip" style="background:#4b69ff"></span><div class="info"><span class="name">DMG</span><span class="thresh">800 ELO · 850 current</span></div><span class="you">YOU</span></div>
+              <div class="rank-row future"><span class="chip" style="background:#8847ff"></span><div class="info"><span class="name">Legendary Eagle</span><span class="thresh">1100 ELO</span></div></div>
+              <div class="rank-row future"><span class="chip" style="background:#d32ce6"></span><div class="info"><span class="name">Supreme</span><span class="thresh">1400 ELO</span></div></div>
+              <div class="rank-row future"><span class="chip" style="background:#eb4b4b"></span><div class="info"><span class="name">Global Elite</span><span class="thresh">1750 ELO</span></div></div>
+              <div class="rank-row future"><span class="chip" style="background:#ff6b00"></span><div class="info"><span class="name">Faceit 10</span><span class="thresh">2100 ELO</span></div></div>
+              <div class="rank-row future"><span class="chip" style="background:#ffd54a"></span><div class="info"><span class="name">Pro</span><span class="thresh">2600 ELO</span></div></div>
+            </div>
+
+            <div class="contract-card">
+              <div class="badge">Offer Available</div>
+              <h4>Tier 2 — Pro Contract</h4>
+              <div class="contract-row"><span class="l">Salary</span><span class="v cash">$3,500 / mo</span></div>
+              <div class="contract-row"><span class="l">Scrim quota</span><span class="v energy">45 energy / day</span></div>
+              <div class="contract-row"><span class="l">Chemistry floor</span><span class="v">30 (below blocks Tier 1)</span></div>
+              <div class="contract-reqs">
+                <span class="req-chip">TIER 3 SIGNED ✓</span>
+                <span class="req-chip">HYPE 60+ ✓</span>
+              </div>
+              <div class="btn gold sign-btn">SIGN CONTRACT</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottomnav">
+          <div class="nav-btn play"><span class="ic"></span>PLAY</div>
+          <div class="nav-btn train"><span class="ic"></span>TRAIN</div>
+          <div class="nav-btn stream"><span class="ic"></span>STREAM</div>
+          <div class="nav-btn cases"><span class="ic"></span>CASES</div>
+          <div class="nav-btn shop"><span class="ic"></span>SHOP</div>
+        </div>
+      </div>
+    </div>
+    <p class="frame-caption">
+      <span class="tag">Stakes, spelled out</span>
+      Past ranks dim, the current rank gets a gold glow and a <b>YOU</b> tag, future ranks stay
+      legible but muted. The Tier-2 offer card puts salary directly against its scrim-time cost —
+      45 energy/day is a third of the player's max — before a single tap commits.
+    </p>
+  </figure>
+
+</div>
+
+<!-- ========================================================================
+     BEFORE / AFTER
+     ======================================================================== -->
+<section class="section-heading"><h2>02 — Room Progression</h2><div class="rule"></div><span class="num">roomTier 0 → 2</span></section>
+
+<div class="ba-wrap">
+  <div class="ba-card">
+    <div class="cv-wrap"><canvas id="canvas-before" width="340" height="300"></canvas></div>
+    <div class="label">
+      <div class="day">Day 1</div>
+      <div class="title">Cramped Bedroom</div>
+      <div class="ba-stats">
+        <div class="st"><span class="v">$0.4/day</span><span class="l">Idle income</span></div>
+        <div class="st"><span class="v">0</span><span class="l">Prestige</span></div>
+        <div class="st"><span class="v">4×4</span><span class="l">Room tiles</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ba-arrow">➜</div>
+
+  <div class="ba-card">
+    <div class="cv-wrap"><canvas id="canvas-after" width="340" height="330"></canvas></div>
+    <div class="label">
+      <div class="day">Day 90</div>
+      <div class="title gold">Gaming Mansion</div>
+      <div class="ba-stats">
+        <div class="st"><span class="v">$41/day</span><span class="l">Idle income</span></div>
+        <div class="st"><span class="v">68</span><span class="l">Prestige</span></div>
+        <div class="st"><span class="v">10×10</span><span class="l">Room tiles</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================================
+     PALETTE / TYPE
+     ======================================================================== -->
+<section class="section-heading"><h2>03 — Palette &amp; Type</h2><div class="rule"></div><span class="num">tokens.css</span></section>
+
+<div class="swatch-panel">
+  <div class="swatch-row">
+    <div class="swatch"><div class="fill" style="background:#070a16"></div><div class="meta"><div class="name">bg-space</div><div class="hex">#070a16</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#0d1226"></div><div class="meta"><div class="name">bg-deep</div><div class="hex">#0d1226</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#1b2140"></div><div class="meta"><div class="name">panel</div><div class="hex">#1b2140</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#2a3260"></div><div class="meta"><div class="name">panel-hi</div><div class="hex">#2a3260</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#121734"></div><div class="meta"><div class="name">panel-lo</div><div class="hex">#121734</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#3d4a80"></div><div class="meta"><div class="name">border</div><div class="hex">#3d4a80</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#6b7ac4"></div><div class="meta"><div class="name">border-hi</div><div class="hex">#6b7ac4</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#eaf0ff"></div><div class="meta"><div class="name">ink</div><div class="hex">#eaf0ff</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#97a3d0"></div><div class="meta"><div class="name">ink-dim</div><div class="hex">#97a3d0</div></div></div>
+  </div>
+
+  <div class="swatch-row">
+    <div class="swatch"><div class="fill" style="background:#3ddc84"></div><div class="meta"><div class="name">cash</div><div class="hex">#3ddc84</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#34d3ff"></div><div class="meta"><div class="name">views</div><div class="hex">#34d3ff</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#ff4d9d"></div><div class="meta"><div class="name">subs</div><div class="hex">#ff4d9d</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#ffc93c"></div><div class="meta"><div class="name">energy</div><div class="hex">#ffc93c</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#ff8a1f"></div><div class="meta"><div class="name">elo</div><div class="hex">#ff8a1f</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#ff4b4b"></div><div class="meta"><div class="name">danger</div><div class="hex">#ff4b4b</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#ffd54a"></div><div class="meta"><div class="name">gold</div><div class="hex">#ffd54a</div></div></div>
+  </div>
+
+  <div class="swatch-row">
+    <div class="swatch"><div class="fill" style="background:#b0c3d9"></div><div class="meta"><div class="name">r-consumer</div><div class="hex">#b0c3d9</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#4b69ff"></div><div class="meta"><div class="name">r-milspec</div><div class="hex">#4b69ff</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#8847ff"></div><div class="meta"><div class="name">r-restricted</div><div class="hex">#8847ff</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#d32ce6"></div><div class="meta"><div class="name">r-classified</div><div class="hex">#d32ce6</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#eb4b4b"></div><div class="meta"><div class="name">r-covert</div><div class="hex">#eb4b4b</div></div></div>
+    <div class="swatch"><div class="fill" style="background:#ffd700"></div><div class="meta"><div class="name">r-rare</div><div class="hex">#ffd700</div></div></div>
+  </div>
+
+  <div class="type-sample">
+    <div class="lg">Pro Simulator</div>
+    <div class="md">Uppercase Heading · 1px Tracking</div>
+    <div class="num">$1,240.50</div>
+    <div class="body">Body copy runs on the same monospace stack as every number in the game —
+      ui-monospace, Cascadia Mono, Consolas, Courier New. 2px chunky borders, 3px hard
+      shadows, never blurred, never above a 4px radius.</div>
+  </div>
+</div>
+
+<footer class="gallery-footer">CS2 Pro Simulator — Mockup Gallery — self-contained, zero dependencies</footer>
+
+<script src="mockups.js"></script>
+</body>
+</html>

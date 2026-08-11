@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070a16">
+<!-- Keep this private playtest build out of search results. This meta is the
+     part that actually works; robots.txt deliberately ALLOWS crawling so that
+     this line can be read and obeyed (see robots.txt for why). Delete both
+     when the game should be discoverable. -->
+<meta name="robots" content="noindex, nofollow">
+<!-- Mobile install (V22b). Added so a playtester can "Add to Home Screen" and
+     launch WITHOUT browser chrome: the address bar otherwise eats ~100px off a
+     layout that is already tall and narrow, and the game is portrait-only.
+     The two apple-* metas are iOS's equivalent of the manifest's `display`
+     and `theme_color`; iOS still ignores manifest display modes. -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CS2 PRO SIM">
+<meta name="mobile-web-app-capable" content="yes">
+<title>CS2 PRO SIMULATOR</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/minigames.css">
+<link rel="stylesheet" href="css/title.css">
+<link rel="stylesheet" href="css/tutorial.css">
+<link rel="stylesheet" href="css/stats.css">
+<link rel="stylesheet" href="css/teams.css">
+<link rel="stylesheet" href="css/phone.css">
+<link rel="stylesheet" href="css/customise.css">
+</head>
+<body>
+
+<div id="device">
+  <div id="app">
+
+    <!-- TITLE / FRONT PAGE ----------------------------------------------- -->
+    <div id="title-layer"></div>
+
+    <!-- TOP BAR ---------------------------------------------------------- -->
+    <header id="topbar"></header>
+
+    <!-- SCREEN STACK ----------------------------------------------------- -->
+    <main id="screen-stack">
+      <section class="screen is-active" id="screen-hub"></section>
+      <section class="screen" id="screen-aim"></section>
+      <section class="screen" id="screen-stream"></section>
+      <section class="screen" id="screen-cases"></section>
+      <section class="screen" id="screen-shop"></section>
+      <section class="screen" id="screen-career"></section>
+      <section class="screen" id="screen-locations"></section>
+      <section class="screen" id="screen-stats"></section>
+      <section class="screen" id="screen-teams"></section>
+      <section class="screen" id="screen-tournaments"></section>
+      <section class="screen" id="screen-social"></section>
+      <section class="screen" id="screen-crypto"></section>
+      <section class="screen" id="screen-sponsors"></section>
+    </main>
+
+    <!-- BOTTOM NAV ------------------------------------------------------- -->
+    <nav id="bottomnav"></nav>
+
+    <!-- OVERLAYS --------------------------------------------------------- -->
+    <div id="toast-layer"></div>
+    <div id="modal-layer"></div>
+    <div id="tutorial-layer"></div>
+    <canvas id="fx-layer"></canvas>
+
+  </div>
+</div>
+
+<!-- core -->
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/iso.js"></script>
+<script src="js/router.js"></script>
+<script src="js/hub.js"></script>
+<script src="js/shop.js"></script>
+<script src="js/career.js"></script>
+<script src="js/locations.js"></script>
+<script src="js/stats.js"></script>
+<script src="js/teams.js"></script>
+<script src="js/tournaments.js"></script>
+<script src="js/social.js"></script>
+<script src="js/crypto.js"></script>
+<script src="js/sponsors.js"></script>
+<script src="js/phone.js"></script>
+<script src="js/customise.js"></script>
+<script src="js/sheep.js"></script>
+<!-- minigames -->
+<script src="js/aim.js"></script>
+<script src="js/stream.js"></script>
+<script src="js/cases.js"></script>
+<!-- shell -->
+<script src="js/title.js"></script>
+<script src="js/tutorial.js"></script>
+<!-- boot -->
+<script src="js/main.js"></script>
+</body>
+</html>

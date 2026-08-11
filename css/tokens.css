@@ -1,0 +1,386 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — design tokens (V16 REDESIGN)
+   Never use raw hex outside this file.
+
+   ---------------------------------------------------------------------------
+   THE DIAGNOSIS (ART-DIRECTION.md §1)
+   The old palette was near-black navy + thin neon accents + a single hard drop
+   shadow and NO OUTLINES. That specific combination is one of the most
+   over-produced looks in AI-generated interfaces, and it is why the owner said
+   the game "looks like AI slop". Props and tiles dissolved into the ground
+   because nothing had an edge.
+
+   THE OWNER'S CONSTRAINT, VERBATIM: do NOT replace navy with "flashing white
+   or flashing neon colors that are gonna make it really hard to see anything
+   and be distracting." So this is NOT a brightness crank. The deep navy
+   identity is kept; what changes is EDGE, VALUE SEPARATION and BUTTON WEIGHT.
+
+   THE MOVE THAT MAKES IT BRIGHT WITHOUT GLARE
+   Light lives in bounded, outlined SHAPES carrying DARK text — never in large
+   glowing fields or glowing type. Measured: --ink on the new surfaces is
+   7.2-10.2:1, and --outline text on the saturated action fills is 8.1-12.5:1.
+   That is how the reference art reads punchy while staying comfortable.
+
+   --ink-dim had to lift with the surfaces: at its old value it measured
+   3.31:1 on the new button face, under the 4.5:1 floor. Lifting surfaces
+   without lifting secondary text is the trap in this kind of rework.
+   ========================================================================== */
+
+:root {
+  /* --- surfaces -------------------------------------------------------
+     A real value ladder now. The frame stays deep (identity + it makes the
+     room canvas glow), while cards/tiles sit high enough that an outlined
+     prop or button reads AS AN OBJECT ON something rather than floating in
+     a void. Old --panel #1b2140 is kept as --surface-lo: it is still the
+     right value for recessed wells and meter tracks. */
+  --bg-space:     #0a0f22;   /* app frame / deepest ground */
+  --bg-deep:      #121a3a;   /* screen ground behind cards */
+  /* V16 §3.1 — the owner's two container hexes. --container-hi #233863 takes
+     over as THE card/panel value (was #2b3568) and --container #1B284A as the
+     recessed well (was #1b2140). Both are within a hair of the values they
+     replace in luminance, so every contrast measurement recorded in this file
+     still holds: --ink 9.7:1 and --ink-dim 6.8:1 on --panel, --ink-dim 8.5:1
+     on --panel-lo. That is why the swap is safe to make globally rather than
+     only on new components. */
+  --container:    #1B284A;   /* owner's deep container */
+  --container-hi: #233863;   /* owner's raised container */
+  --panel:        var(--container-hi);  /* THE card/panel value */
+  --panel-hi:     #38447f;   /* raised: button faces, selected tiles */
+  --panel-lo:     var(--container);     /* recessed: wells, meter tracks, headers */
+  --border:       #55639f;
+  --border-hi:    #8492d8;
+
+  --surface:      var(--container-hi);  /* aliases so V15 code keeps working */
+  --surface-hi:   #38447f;
+  --surface-lo:   var(--container);
+
+  /* --- the edge system — the single biggest change ---------------------
+     A 2px near-black outline on every tile, button, card and prop. Blue-black
+     rather than pure black so it belongs to this palette instead of punching
+     a hole in it. js/iso.js's Iso.rampShade() uses this exact literal, so the
+     canvas art and the DOM chrome share one edge. */
+  --outline:      #0b0e1c;
+  --bevel-hi:     #6675c4;   /* inner TOP edge — catches the light */
+  --bevel-lo:     #151b3c;   /* inner BOTTOM edge — the object's own shadow */
+
+  /* V16 §3.2/§3.3 — the arcade-chrome edge set. --pixel-black is TRUE black:
+     the reference art outlines its nav tiles and its icons in pure #000, not
+     in the blue-black --outline, and that extra step of contrast is what makes
+     a saturated tile read as a moulded plastic key. --outline stays the house
+     edge for panels/props so the canvas and the chrome still agree. */
+  --pixel-black:  #000000;
+  --modal-inner:  #3B82EC;   /* 1px light stroke inside the modal's black border */
+  --gloss-hi:     rgba(255, 255, 255, .8);  /* the 45° 1px highlight stripe */
+  --gloss-dim:    rgba(255, 255, 255, .34); /* same stripe on dark/navy faces */
+
+  /* --- accents (§3.1) --------------------------------------------------- */
+  --acc-cyan:     #00E5FF;
+  --acc-green:    #00FF66;
+  --acc-gold:     #FFD000;
+
+  /* --- bottom nav, one colour per tab (§3.1) ---------------------------- */
+  --nav-train:    #FFCC00;
+  --nav-play:     #FF5500;
+  --nav-stream:   #FF00A0;
+  --nav-cases:    #00CCFF;
+  --nav-shop:     #77EE00;
+
+  /* --- text ------------------------------------------------------------ */
+  --ink:          #eaf0ff;
+  --ink-dim:      #c2cbee;   /* lifted with the surfaces — see header note */
+  --ink-on-fill:  #0b0e1c;   /* dark label for saturated action fills */
+
+  /* --- resources — unchanged. These already carry meaning across the whole
+     game and are the one part of the old palette that was never the problem. */
+  --cash:         #3ddc84;
+  --views:        #34d3ff;
+  --subs:         #ff4d9d;
+  --energy:       #ffc93c;
+  --elo:          #ff8a1f;
+  --danger:       #ff4b4b;
+  --gold:         #ffd54a;
+
+  /* --- CS rarity — real CS2 rarity colours. Do not redesign these. ------ */
+  --r-consumer:   #b0c3d9;
+  --r-milspec:    #4b69ff;
+  --r-restricted: #8847ff;
+  --r-classified: #d32ce6;
+  --r-covert:     #eb4b4b;
+  --r-rare:       #ffd700;
+
+  --wallpaper-ink: #8ea0e8;  /* tiled motif; only ever at low alpha */
+
+  /* --- type ------------------------------------------------------------ */
+  --font: ui-monospace, "Cascadia Mono", "Consolas", "Courier New", monospace;
+
+  /* --- chrome ---------------------------------------------------------- */
+  --bw: 2px;
+  --shadow: 0 3px 0 var(--outline);      /* hard, never blurred — the world chose this */
+  --shadow-lg: 0 5px 0 var(--outline);
+  --radius: 4px;
+  --radius-pixel: 3px;                   /* §3.3 modal corner cut-out */
+
+  /* the keycap knobs — see the .btn block below */
+  --btn-edge-h: 5px;      /* height of the solid bottom edge */
+  --btn-edge-shade: .52;  /* brightness() applied to the button's own colour */
+  --gloss-off: 5px;       /* how far down the 45° diagonal the stripe sits */
+
+  /* === V18 — DENSE 16-BIT TACTILE UI ==================================
+     Owner brief: every UI element carries a continuous 1px TRUE-black outer
+     outline; buttons are never flat but ride a 3-tone ramp; modals are
+     double-bordered; grids and lists have their own fixed anatomy.
+
+     --pixel-black (#000000) above is the outline for all of it. --outline
+     (blue-black) stays the *canvas/prop* edge so js/iso.js and the chrome
+     still agree — do not swap one for the other. ------------------------ */
+
+  /* Button 3-tone ramp. Each variant sets --btn-base and the other two are
+     derived, so a new colour never needs three hand-picked hexes. */
+  --btn-hi-lift:  1.42;   /* brightness() for the 1-2px top highlight strip */
+  --btn-lo-drop:  0.48;   /* brightness() for the 2-3px bottom shadow strip */
+  --btn-hi-h:     2px;    /* top highlight strip height */
+  --btn-lo-h:     3px;    /* bottom shadow strip height */
+  --btn-press:    2px;    /* how far the sprite drops when pressed */
+
+  /* --- V20 §D — THE DEAD KEY (disabled controls) ----------------------
+     Disabled used to be `filter: grayscale() brightness()`. Two things were
+     wrong with that and both were measured, not assumed:
+
+       1. It recolours the LABEL and the FACE by the same transform, so the
+          label's contrast is whatever falls out. Measured through the old
+          `grayscale(.75) brightness(.7)`: the STREAM nav tile's dark
+          --ink-on-fill label landed at 1.54:1, PLAY at 2.54:1, a disabled
+          .btn--danger at 2.11:1, .btn--primary at 3.84:1. The floor is 4.5.
+       2. A filter promotes the element to its own render surface, so the
+          type is drawn into a texture and composited rather than painted
+          onto the page — which is one of the three causes of the blurred
+          .mg-start-btn label documented in css/minigames.css.
+
+     So a dead control is now STATED, in four literals, and reads as inert
+     rather than faded. The three face tones are the LIVE ramp inverted:
+     a live key is lit from the top (bright --btn-hi-lift strip above, dark
+     --btn-lo-drop strip below, hard black drop shadow underneath) and reads
+     RAISED; a dead key takes the same two ratios the other way round — dark
+     above, faint rim below, and NO drop shadow — and reads PRESSED IN AND
+     DEAD. --dead-shade/--dead-rim are exactly --dead-fill x --btn-lo-drop
+     and x --btn-hi-lift, so the dead key belongs to the same ramp system
+     it inverts; they are literals here only because literals belong here.
+
+     Chroma is what carries "drained": --dead-fill's max-min channel spread
+     is 13 against --panel-hi's 71 and the nav hues' 255, so a locked key
+     reads as colour REMOVED, not colour dimmed — next to a live key there is
+     no ambiguity even though the two sit at a similar lightness.
+
+     --dead-ink measures 7.35:1 on --dead-fill, 6.20:1 on --dead-rim and
+     8.64:1 on --dead-shade, so the label clears the 4.5:1 floor on every
+     band of the face it can land on. The treatment itself is one block at
+     the end of css/style.css — see "V20 §D — THE DEAD KEY" there. */
+  --dead-fill:   #1C2029;   /* disabled face — deep, drained, chroma 13 */
+  --dead-shade:  #0D0F14;   /* top inner strip  = --dead-fill x .48  */
+  --dead-rim:    #282D3A;   /* bottom inner rim = --dead-fill x 1.42 */
+  --dead-ink:    #A9AEBC;   /* disabled label / glyph */
+
+  /* Modal anatomy: 2px black outer, then a 1px bright inner highlight. */
+  --modal-outer:  2px;
+  --modal-inner-w: 1px;
+  --modal-fill:   var(--container);
+
+  /* Full-screen menu ground — a two-tone checkerboard, never a flat field. */
+  --checker-a:    #1A2440;
+  --checker-b:    #1D2948;
+  --checker-size: 16px;
+
+  /* Grid slots (inventory / shop). */
+  --slot-fill:    #0D152B;
+  --slot-border:  #5A7BB8;
+  --slot-sel:     #FFCC00;
+  --slot-sel-alt: #00FF66;
+
+  /* List rows — alternating shades + a 1px divider, label left / value right. */
+  --row-a:        #1A2440;
+  --row-b:        #16203A;
+  --row-divider:  #0E1428;
+
+  /* Type: white headers with a 1px black outline; numbers in bright accents. */
+  --ink-head:     #FFFFFF;
+  --num-warm:     #FFEE00;
+  --num-cool:     #80FFFF;
+  /* 1px black outline on text, built from 4 offset shadows (no -webkit-only
+     stroke, which drops out in some engines and would silently un-outline
+     every header). */
+  --text-outline:
+     1px 0 0 var(--pixel-black), -1px 0 0 var(--pixel-black),
+     0 1px 0 var(--pixel-black), 0 -1px 0 var(--pixel-black);
+
+  /* Close button — chunky red disc, overlaps the modal's outer border. */
+  --close-fill:   #F03020;
+
+  /* Tutorial speech bubbles. */
+  --bubble-fill:  #D3D9E5;
+  --bubble-ink:   #0E1428;
+
+  /* --- layout ---------------------------------------------------------- */
+  --app-w: 420px;
+  --app-h: 860px;
+  --topbar-h: 86px;
+  --nav-h: 78px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-space);
+  color: var(--ink);
+  font-family: var(--font);
+  -webkit-font-smoothing: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+/* --- reusable pixel-UI primitives -------------------------------------
+   Every panel and button now carries the same three-part edge:
+     outer   2px --outline    (the near-black line)
+     inner   2px --bevel-hi   top    (light — catches the light)
+     inner   2px --bevel-lo   bottom (dark — the object's own shadow)
+   That inset pair is what makes a tile read as MOULDED rather than printed.
+   A drop shadow alone never did. */
+
+.panel {
+  background: var(--panel);
+  border: var(--bw) solid var(--outline);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+}
+
+/* ---- V16 §3.2: THE 3D KEYCAP -------------------------------------------
+   Three layers make a button read as a physical block instead of a rectangle
+   with a drop shadow:
+
+     ::after   the SOLID BOTTOM EDGE. `background: inherit` copies whatever
+               background the button was given — by ANY stylesheet, including
+               the ones this package does not own — and brightness() darkens
+               it, so every button's edge is a darker shade OF ITS OWN COLOUR
+               rather than one shared grey. That is the whole point of §3.2,
+               and deriving it this way is why a magenta EDIT ROOM button and
+               a lime SHOP tab both get the right edge with no per-variant
+               token. It is painted INSIDE the padding box on purpose: an
+               overhanging edge would add real overflow and could scroll a
+               420px-wide screen sideways or get clipped in a scroll list.
+
+     ::before  the GLOSS — a 45°, 1px highlight stripe over the top-left edge.
+
+     shadow    a hard --outline drop, unblurred, as before.
+
+   PRESS = translateY(2px) AND the edge is hidden (`::after { opacity: 0 }`)
+   while the drop shadow collapses by the same 2px. Losing the coloured edge
+   is what actually sells the depth — a button that only slides down still
+   looks like a sticker. Collapsing the drop shadow in step keeps the block's
+   bottom within a pixel of where it started, so the key compresses in place
+   instead of sliding down the screen. */
+.btn {
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--panel-hi);
+  border: var(--bw) solid var(--outline);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    var(--shadow);
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: transform .04s linear, filter .1s linear;
+}
+.btn::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: var(--btn-edge-h);
+  background: inherit;
+  filter: brightness(var(--btn-edge-shade));
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  pointer-events: none;
+  transition: opacity .04s linear;
+}
+.btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: calc(var(--radius) - 1px);
+  background: linear-gradient(135deg,
+    transparent 0 var(--gloss-off),
+    var(--gloss) var(--gloss-off) calc(var(--gloss-off) + 1px),
+    transparent calc(var(--gloss-off) + 1px));
+  pointer-events: none;
+}
+.btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-lo),
+    0 1px 0 var(--outline);
+}
+.btn:active::after { opacity: 0; }
+/* Disabled is NOT declared here any more. It used to be
+   `filter: grayscale(.7) brightness(.6)`, which destroyed label contrast
+   (measured 2.11:1 on a disabled --danger button) and pulled the key onto its
+   own render surface. The whole treatment now lives in ONE place — the
+   "V20 §D — THE DEAD KEY" block at the end of css/style.css — because it is
+   built as the inversion of that file's V18 3-tone ramp and the two have to
+   be read together. Its tokens are declared above. Do not re-add a disabled
+   rule here: a second one would be exactly the mirror HANDOFF §9.1 is about. */
+/* Default (navy) faces take the dimmer stripe — the full-strength gloss is
+   for saturated fills, where it reads as a glint rather than a scratch. */
+.btn { --gloss: var(--gloss-dim); }
+.btn--primary, .btn--danger, .btn--gold,
+.navbtn, .toast, .reward-card__title { --gloss: var(--gloss-hi); }
+
+/* PRIMARY — a saturated fill with a DARK label. This is the whole
+   brightness strategy: light in a bounded, outlined shape rather than a
+   glowing field or glowing text, which is what keeps it punchy without the
+   glare the owner explicitly ruled out. Measured 10.76:1. */
+.btn--primary {
+  background: var(--cash);
+  color: var(--ink-on-fill);
+  --bevel-hi: rgba(255, 255, 255, .55);
+  --bevel-lo: rgba(0, 0, 0, .35);
+}
+.btn--danger {
+  background: var(--danger);
+  color: var(--ink-on-fill);
+  --bevel-hi: rgba(255, 255, 255, .5);
+  --bevel-lo: rgba(0, 0, 0, .35);
+}
+.btn--gold {
+  /* §3.1's gold. --gold (#ffd54a) stays as-is because it also carries CS
+     rarity meaning in the case/skin screens; the ACCENT gold is the button
+     fill only. */
+  background: var(--acc-gold);
+  color: var(--ink-on-fill);
+  --bevel-hi: rgba(255, 255, 255, .55);
+  --bevel-lo: rgba(0, 0, 0, .35);
+}
+/* §3.1 accents in service of something real: cyan is the keyboard focus ring
+   (the app had none outside the topbar), neon green is the lit top rim on the
+   confirm/primary action so the "yes" key reads hotter than its neighbour. */
+.btn:focus-visible, .navbtn:focus-visible {
+  outline: var(--bw) solid var(--acc-cyan);
+  outline-offset: 2px;
+}
+.btn--primary { --bevel-hi: var(--acc-green); }
+
+.h-label {
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+  color: var(--ink-dim);
+}

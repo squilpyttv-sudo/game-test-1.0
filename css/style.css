@@ -1,0 +1,1761 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/style.css
+   Core chrome + hub + shop + career + modals + toasts.
+   Uses ONLY custom properties declared in css/tokens.css.
+   ========================================================================== */
+
+body {
+  display: flex;
+}
+
+#device {
+  flex: 1;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: radial-gradient(ellipse at 50% 20%, var(--bg-deep), var(--bg-space));
+}
+
+#app {
+  width: var(--app-w);
+  height: var(--app-h);
+  max-width: 100vw;
+  max-height: 100vh;
+  background: var(--bg-space);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: var(--bw) solid var(--outline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 440px), (max-height: 880px) {
+  #app { width: 100vw; height: 100vh; border: none; border-radius: 0; }
+  #device { padding: 0; }
+}
+
+/* ==========================================================================
+   TOP BAR
+   ========================================================================== */
+/* ---- V18 HEADER — ONE CHUNKY TOP BANNER, THREE MODULES -------------------
+   The V17 header was a rank column, a 2x2 number grid and a day column all
+   floating loose on the same navy as the world behind them, separated by a
+   2px blue-black line that read as part of the scene. It is now a single
+   deep-slate-blue banner cut off from the isometric world by a hard 2px TRUE
+   BLACK bottom border (set once, at the bottom of this file with the rest of
+   the §2.1 edge work), carrying three self-contained modules:
+
+     LEFT    rank & progression, in an inset well
+     CENTRE  economy — money / followers / subscribers, a framed sub-panel
+     RIGHT   vitals & time — DAY N, energy, SLEEP, and SETTINGS pinned to the
+             absolute top-right corner of the banner
+
+   MAX VIEWS (the eye stat) is GONE from this header, and with it the PEAK
+   VIEWERS row of the explainer modal it opens — see RESOURCES_INFO in
+   js/main.js. The stat is still tracked and still shown on the stream and
+   career screens; it just no longer competes for space up here.
+
+   The buttons in this header do NOT hand-roll a second bevel system: the
+   settings key and the SLEEP key take §2.2's 3-tone ramp, derived from their
+   own background with `background: inherit` + brightness(), exactly like
+   .btn and .navbtn. Adding a colour here never means picking three hexes. */
+#topbar {
+  /* SPEC-V7 §1: min-height (not a fixed height) so the extra safe-area
+     padding below GROWS the bar on a notched phone instead of squeezing
+     its content into the same 86px — a top notch/dynamic island must never
+     clip the rank/money/followers/subscribers/day/energy row. */
+  min-height: var(--topbar-h);
+  flex: 0 0 auto;
+  /* --container, the deepest of the two owner container values: the banner
+     has to sit BELOW the three module wells in value or the "inset" reading
+     inverts and the modules look like they are floating again. */
+  background: var(--container);
+  /* a 1px lit top lip, so the banner itself reads as a moulded slab rather
+     than a flat fill. The bottom edge is the hard black cut, not a highlight
+     — the old inset --bevel-hi bottom line was what made the header blend
+     into the world instead of separating from it. */
+  box-shadow: inset 0 1px 0 var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(8px + var(--safe-top)) 8px 8px;
+  gap: 6px;
+  position: relative;
+  z-index: 5;
+}
+
+/* ---- LEFT MODULE — RANK & PROGRESSION -----------------------------------
+   One inset container: --slot-fill (the darker blue the grid slots use) with
+   a 1px light-blue inner highlight ring, so the whole module reads as a
+   window cut into the banner. Three children on a 2-row grid — badge and
+   text side by side, the ELO bar spanning both underneath.
+
+   The flat rank-name box is replaced by the authored pixel shield
+   (ICONS.rankBadge). The old `.rank-chip` class is NOT reused: js/stats.js
+   and js/title.js both build text chips with it and neither file is ours, so
+   restyling it into a badge would have silently reshaped the career screen
+   and the save-slot cards. Its rule below is left exactly as it was. */
+.topbar__rank {
+  flex: 0 0 auto; width: 132px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "badge text" "bar bar";
+  align-items: center;
+  gap: 4px 6px;
+  padding: 4px 5px;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 0 0 1px var(--slot-border);
+}
+/* the shield's `color` is written per rank tier from refreshTopbar(); every
+   path in the glyph fills with currentColor, so a promotion is one style
+   write and never new markup on the 1s tick. */
+.rank-badge {
+  grid-area: badge; display: flex; flex: 0 0 auto;
+  width: 22px; height: 22px; color: var(--border-hi);
+}
+.rank-badge svg { width: 22px; height: 22px; display: block; }
+.topbar__rank-text {
+  grid-area: text; display: flex; flex-direction: column; gap: 1px; min-width: 0;
+}
+/* crisp white with the 1px black outline (§2.6) — on --slot-fill this is
+   19.5:1, well past the 4.5:1 floor, and the outline keeps the glyph edges
+   readable at 8.5px where a thin light-on-dark stroke would smear. */
+.topbar__rank-elo,
+.topbar__rank-name {
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar__rank-elo { font-size: 10px; letter-spacing: .2px; }
+.topbar__rank-name { font-size: 8.5px; letter-spacing: .6px; }
+/* CHUNKY: 7px tall (the brief's >=6px floor), a 1px black outline, the fill
+   in --num-warm and a dark empty track. Square, not rounded: a 7px bar with
+   a 4px radius is mostly corner. */
+.rank-progress {
+  grid-area: bar;
+  height: 7px; width: 100%;
+  background: var(--row-divider);
+  border: 1px solid var(--pixel-black);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+/* SPEC §6's first hazard, applied to the two header bars this package fully
+   owns: the fill is full-width and SCALED, never re-widthed. `width` is a
+   layout property, and both of these are repainted from a 1s tick — an
+   animated width on the energy bar reflowed the header 0.4s out of every
+   second, inside the same fixed band the SLEEP key and the gear live in.
+   transform is composited and never touches layout.
+
+   Both fills are plain <div>s inside an overflow:hidden <div>/<button>, NOT
+   SVG children — the phone's battery fill could not take this treatment
+   because CSS transforms are ignored on SVG children in this engine, and
+   that fix had to be a removed transition instead. Verified rendering here
+   at 0%, 40% and 100% before this was kept.
+
+   js/main.js writes scaleX() on both; nothing else in the app touches either
+   node (they are the only two fills in the codebase driven solely by this
+   package — .meter__fill and .hub__sleep-bar-fill are written by career.js /
+   crypto.js / social.js / sponsors.js / tournaments.js / phone.js / hub.js
+   and keep their width transition, since converting them means editing files
+   this package does not own). */
+.rank-progress__fill {
+  height: 100%; width: 100%;
+  background: var(--num-warm);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform .4s ease;
+}
+/* kept for js/stats.js, which still renders a .rank-progress__label. */
+.rank-progress__label { font-size: 10.5px; font-weight: 700; color: var(--ink-dim); letter-spacing: .3px; }
+
+/* ---- CENTRE MODULE — ECONOMY -------------------------------------------
+   A distinct framed sub-panel with the same inset anatomy as the rank well,
+   so the two read as one system. THREE stats now, not four: the eye/Max
+   Views row is deleted. Three stacked rows rather than the old 2x2 grid —
+   at 420px a 2x2 of icon+number pairs read as number soup, and the stacked
+   row form (icon hard left, value hard right) is §2.5's list anatomy, which
+   every other list in the app already follows.
+
+   §9: the whole block is ONE tap target with ONE handler, bound once in
+   buildTopbar() and never re-bound from the 1s tick (HANDOFF §9.5). */
+.topbar__resources {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; flex-direction: column;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  cursor: pointer;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 0 0 1px var(--slot-border);
+  padding: 3px 6px;
+  transition: filter .1s linear, transform .04s linear;
+}
+/* §2.5's row anatomy, at header scale: a 1px --row-divider between the
+   stats. Without it the icon and its number sit at opposite ends of a 120px
+   run with nothing tying them together, and the block reads as six loose
+   marks instead of three rows. The rows are NOT also alternately shaded —
+   inside a 53px well three tones would be noise, and the divider alone is
+   what does the work at this size. */
+.res {
+  display: flex; align-items: center; gap: 5px; line-height: 1; min-width: 0;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--row-divider);
+}
+.res:last-child { border-bottom: none; }
+.res-icon { display: flex; flex: 0 0 auto; width: 15px; height: 15px; }
+.res-icon svg { width: 15px; height: 15px; display: block; }
+/* value hard right (§2.5). The number, not the icon, is what the player
+   scans down the column, so the three of them share one right edge — and a
+   number that grows ($250 -> $1.24M) then grows leftward into empty space
+   instead of shoving the row's right edge around on the 1s tick. */
+.res > span + span {
+  flex: 1 1 auto; min-width: 0;
+  text-align: right;
+  overflow: hidden; text-overflow: ellipsis;
+}
+/* the brief's three hues. Measured on --slot-fill: green 15.9:1,
+   pink 6.4:1, yellow 15.7:1 — the icon beside each carries the same colour
+   plus the 1px black outline every .pixicon gets from .pixicon .po. */
+.res--cash { color: var(--acc-green); }
+.res--subs { color: var(--subs); }
+.res--subscribers { color: var(--num-warm); }
+.topbar__resources:active { transform: translateY(1px); filter: brightness(1.3); }
+.topbar__resources:focus-visible { outline: 2px solid var(--border-hi); outline-offset: 3px; }
+
+/* ---- RIGHT MODULE — VITALS, TIME, SETTINGS ------------------------------ */
+.topbar__day {
+  flex: 0 0 auto; width: 124px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px;
+  position: relative;
+}
+/* DAY N in crisp white, anchored directly above the energy bar (it used to
+   sit on a flex line beside the settings icon, which is why the two never
+   read as belonging to different jobs). Left-aligned over the bar it
+   labels; the gear is pinned in the corner well clear of it. */
+.topbar__day-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  color: var(--ink-head); text-shadow: var(--text-outline);
+  padding-right: 30px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* SETTINGS — a grey 16-bit gear on a square tactile key, absolute in the
+   banner's top-right corner. It is absolutely positioned against #topbar
+   (already position:relative), so it is out of the three modules' flow and
+   cannot squeeze them; .topbar__day-label reserves 30px of right padding so
+   nothing ever runs under it.
+
+   The brief asks for GREY, and tokens.css has no neutral grey at all — every
+   surface, border and ink in it is a blue navy, and the one grey it does
+   carry (--r-consumer) is a CS2 rarity colour whose meaning is fixed. So both
+   greys here are mixed from the two tokens that ARE achromatic, --ink-head
+   (pure white) and --pixel-black: 30% white gives the key face rgb(77,77,77)
+   and 78% gives the glyph rgb(199,199,199) — a true neutral pair measuring
+   5.0:1, not the lavender a navy token would have produced. The two ramp
+   strips then come off the face automatically. */
+.topbar__settings {
+  position: absolute;
+  top: calc(var(--safe-top) + 6px);
+  right: 8px;
+  z-index: 2;
+  width: 26px; height: 26px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--ink-head) 30%, var(--pixel-black));
+  color: color-mix(in srgb, var(--ink-head) 78%, var(--pixel-black));
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: 0 2px 0 var(--pixel-black);
+  cursor: pointer; padding: 0;
+  transition: transform .04s linear;
+}
+.topbar__settings svg { width: 15px; height: 15px; display: block; }
+
+.energy-bar {
+  position: relative;
+  width: 100%; height: 8px;
+  background: var(--row-divider);
+  border: 1px solid var(--pixel-black);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  display: block; padding: 0; cursor: pointer; font: inherit;
+}
+/* scaleX, not width — see .rank-progress__fill above. The segment notches are
+   ruled over the whole bar by .energy-bar::after on the PARENT, so they stay
+   fixed while the fill scales underneath them, which is what makes the level
+   read as N discrete cells emptying rather than a bar shrinking. */
+.energy-bar__fill {
+  height: 100%; width: 100%;
+  background: var(--acc-cyan);
+  transform: scaleX(1);
+  transform-origin: left center;
+  transition: transform .4s ease;
+}
+/* SEGMENTED: hard black notches ruled over the whole bar, so the fill reads
+   as N discrete cells rather than a smooth liquid level. A repeating
+   gradient on a pseudo-element, not N child nodes — the bar is repainted
+   every second and must never gain or lose DOM. */
+.energy-bar::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg,
+    transparent 0 7px, var(--pixel-black) 7px 8px);
+}
+/* SPEC-V3 §2: a subtle cool tint on the energy bar itself at night, since
+   awake-night regen is 0/sec — a small, ambient echo of the backdrop mood. */
+.energy-bar--night .energy-bar__fill { background: var(--views); }
+
+/* ---- SPEC-V20 §6: the energy row (SLEEP moved off the header entirely) --
+   SPEC-V17 §3 used to pair a .tb-sleep key with the energy bar on this row;
+   that button is deleted outright (sleeping is now a tap on the bed in the
+   room — js/hub.js) so the row holds only the bar now. Kept as its own flex
+   row rather than folded away because .topbar__day still depends on this
+   box's height for its 12 + 4 + 32 = 48px stack inside --topbar-h. */
+.topbar__energy-row { display: flex; align-items: center; gap: 6px; width: 100%; }
+.topbar__energy-row .energy-bar { flex: 1 1 auto; min-width: 0; }
+
+/* ---- the header settings key's own ramp ---------------------------------
+   V18: SLEEP used to share this exact construction (a `background: inherit`
+   + brightness() strip pair, same move as .btn/.navbtn) as .tb-sleep, which
+   is why these rules used to carry a second selector. SPEC-V20 §6 deleted
+   that button outright, so .topbar__settings now owns this construction
+   alone rather than sharing it with a sibling that no longer exists. */
+.topbar__settings::before,
+.topbar__settings::after {
+  content: '';
+  position: absolute; left: 0; right: 0;
+  background: inherit;
+  background-image: none;
+  pointer-events: none;
+}
+.topbar__settings::before {
+  top: 0;
+  height: var(--btn-hi-h);
+  filter: brightness(var(--btn-hi-lift));
+  border-radius: var(--radius-pixel) var(--radius-pixel) 0 0;
+}
+.topbar__settings::after {
+  bottom: 0;
+  height: var(--btn-lo-h);
+  filter: brightness(var(--btn-lo-drop));
+  border-radius: 0 0 var(--radius-pixel) var(--radius-pixel);
+  /* scaleY, not height — §6's first hazard. */
+  transform-origin: bottom center;
+  transition: transform .04s linear;
+}
+.topbar__settings:active {
+  transform: translateY(var(--btn-press));
+  box-shadow: 0 0 0 var(--pixel-black);
+}
+.topbar__settings:active::after { transform: scaleY(.34); }
+.topbar__settings:active::before { filter: brightness(1); }
+@media (prefers-reduced-motion: reduce) {
+  .topbar__settings::after { transition: none; }
+}
+
+/* ==========================================================================
+   SCREEN STACK
+   ========================================================================== */
+#screen-stack { position: relative; flex: 1 1 auto; overflow: hidden; background: var(--bg-space); }
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; overflow-y: auto; }
+.screen.is-active { display: flex; }
+
+.screen-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: var(--bw) solid var(--outline); background: var(--panel);
+  box-shadow: inset 0 var(--bw) 0 var(--bevel-hi);
+  flex: 0 0 auto;
+}
+.screen-header__title { font-size: 14px; font-weight: 700; letter-spacing: 1px; }
+.screen-header__back { font-size: 10px; padding: 8px 12px; }
+
+/* ==========================================================================
+   BOTTOM NAV
+   ========================================================================== */
+#bottomnav {
+  /* SPEC-V7 §1: same min-height treatment as #topbar so the home-indicator
+     safe area grows the nav instead of squashing the nav buttons under it. */
+  min-height: var(--nav-h); flex: 0 0 auto; display: flex;
+  background: var(--panel-lo); border-top: var(--bw) solid var(--outline);
+  box-shadow: inset 0 var(--bw) 0 var(--bevel-hi);
+  padding: 7px 6px calc(7px + var(--safe-bottom)); gap: 7px; position: relative; z-index: 5;
+}
+/* V16: the boldest element on screen (owner's brief). Each item already
+   carries its own resource colour via --navbtn-color (set per-button from
+   js/main.js); the fill now IS that colour — a saturated, black-outlined
+   object rather than a dark tile with a tinted icon. Dark ink-on-fill text
+   is what keeps five different hues legible side by side without glare
+   (measured 6.2-13.6:1 across every resource colour used here). */
+/* V16 §3.1/§3.2: five keycaps, one hue each (--nav-train/play/stream/cases/
+   shop, assigned per button in js/main.js). Same three-layer construction as
+   .btn — ::after is the solid bottom edge in a darker shade of the tile's OWN
+   hue, ::before is the 45° gloss — but the outline steps up from the house
+   --outline to true --pixel-black, which is what lets five saturated hues sit
+   side by side without bleeding into one another. */
+.navbtn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: var(--navbtn-color, var(--panel-hi));
+  border: var(--bw) solid var(--pixel-black);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 var(--bw) 0 rgba(255, 255, 255, .5),
+    var(--shadow);
+  cursor: pointer; position: relative;
+  /* content is pushed clear of the ::after edge band. Without this the
+     "-20"/"FREE" cost line lands ON the darkened band, where the dark
+     --ink-on-fill label measures ~2.1:1 — the .btn variants have enough
+     bottom padding already, but the nav tile packs three lines and does
+     not. */
+  padding-bottom: var(--btn-edge-h);
+  transition: transform .04s linear, filter .1s linear;
+}
+.navbtn::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: var(--btn-edge-h);
+  background: inherit;
+  filter: brightness(var(--btn-edge-shade));
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  pointer-events: none;
+  transition: opacity .04s linear;
+}
+.navbtn::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: calc(var(--radius) - 1px);
+  background: linear-gradient(135deg,
+    transparent 0 var(--gloss-off),
+    var(--gloss) var(--gloss-off) calc(var(--gloss-off) + 1px),
+    transparent calc(var(--gloss-off) + 1px));
+  pointer-events: none;
+}
+.navbtn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 var(--bw) 0 rgba(0, 0, 0, .3),
+    0 1px 0 var(--outline);
+}
+.navbtn:active::after { opacity: 0; }
+/* The icon sits in a recessed window cut into the tile — a darker shade of the
+   tile's own colour again (rgba black over the hue, so it tracks whatever hue
+   the tile has, including the six TRAIN grade colours). A near-white glyph on
+   that window measures 6.5-9.7:1 across all five nav hues, which is what a
+   1px-black-outlined pixel icon needs to stay readable at 20px. */
+.navbtn__icon {
+  color: var(--ink);
+  background: rgba(0, 0, 0, .55);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  padding: 2px 5px;
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, .45);
+  line-height: 0;
+  position: relative; z-index: 1;
+}
+.navbtn__icon svg { width: 20px; height: 20px; display: block; }
+.navbtn__icon--grade {
+  font-size: 15px; font-weight: 700; line-height: 20px; height: 20px;
+  min-width: 20px; text-align: center;
+}
+.navbtn__label { font-size: 8.5px; font-weight: 700; letter-spacing: .5px; color: var(--ink-on-fill); }
+/* full-strength ink-on-fill, not a lighter/lower-opacity tint — on --subs
+   and --danger fills a 72%-opacity version measured under 4.5:1 at this
+   size. Hierarchy comes from the smaller size, not a weaker colour. */
+.navbtn__cost { font-size: 8px; font-weight: 700; color: var(--ink-on-fill); }
+.navbtn__label, .navbtn__cost { position: relative; z-index: 1; }
+/* Appearance is in the "V20 §D — THE DEAD KEY" block at the end of this file;
+   only the interaction bit lives here, unchanged. The old
+   `filter: grayscale(.75) brightness(.7)` measured 1.54:1 on the STREAM tile's
+   label and 2.54:1 on PLAY's.
+   .navbtn--soon lost its `opacity: .55` and now paints nothing: js/main.js only
+   ever sets it together with --disabled (`!ready` implies `disabled` in
+   refreshBottomNav), so it was a second fade stacked on the first — and an
+   opacity below 1 promotes the tile to its own compositing layer, which is the
+   same defect as the filter and the same one .mg-cost was fixed for in
+   css/minigames.css. A module that failed to load is exactly as unavailable as
+   a locked one; the dead face and the lock pip already say so. */
+.navbtn--disabled { cursor: not-allowed; }
+.navbtn__lock {
+  position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; padding: 2px;
+  color: var(--danger); background: var(--panel-lo);
+  border: 1.5px solid var(--pixel-black); border-radius: 50%; box-sizing: content-box;
+  z-index: 2;
+}
+
+/* ---- authored pixel-art icon system (§3.2) ------------------------------
+   Every nav glyph is drawn as flat rectangles on a 16x16 grid in js/main.js.
+   The outline is not hand-drawn per icon: paint-order:stroke puts a 2-unit
+   stroke UNDER the fill, so exactly 1 unit shows outside the silhouette —
+   one rule gives every icon a true 1px black outline that always follows the
+   shape, and crispEdges keeps every edge on the pixel grid. */
+.pixicon { shape-rendering: crispEdges; overflow: visible; }
+.pixicon .po {
+  fill: currentColor;
+  stroke: var(--pixel-black);
+  stroke-width: 2;
+  stroke-linejoin: miter;
+  paint-order: stroke;
+}
+
+/* ==========================================================================
+   HUB
+   ========================================================================== */
+/* position: relative so .hub__sleep can anchor to the hub's bottom edge
+   instead of stealing height from the canvas — see the ASLEEP panel note. */
+.hub { display: flex; flex-direction: column; height: 100%; position: relative; }
+.hub__canvas-wrap {
+  flex: 1 1 auto; position: relative; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 25%, var(--bg-deep), var(--bg-space));
+}
+/* touch-action: none (SPEC-V7 §4) — the canvas handles pinch/scroll zoom
+   itself; without this the browser's own touch scroll/pinch-zoom competes
+   with it (double-handling the gesture, or the page itself sliding). */
+.hub__canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+
+.hub__location-badge {
+  /* top offset tracks --hub-top-inset (set from JS, see hub__top-banners
+     below) so the badge always sits just under the banner stack instead of
+     under a hardcoded 8px that would put it behind/under the banner text.
+     Box model (padding/border widths) is unchanged from the previous pass
+     so the JS-measured --hub-top-inset stays valid — only the edge/bevel
+     treatment moved to the outline system. */
+  position: absolute; left: 8px; top: calc(8px + var(--hub-top-inset, 0px)); z-index: 4;
+  transition: top .2s ease;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--panel); border: var(--bw) solid var(--outline);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  border-radius: var(--radius); padding: 5px 9px; cursor: pointer;
+  max-width: 62%;
+}
+.hub__location-name { font-size: 10px; font-weight: 700; letter-spacing: .5px; color: var(--ink); }
+.hub__location-rent { font-size: 9px; color: var(--ink-dim); }
+/* V16: --danger text directly on the --panel badge measures 3.51:1 — under
+   the 4.5:1 floor now that --panel lifted off near-black. A small filled
+   chip (dark text on the saturated colour) fixes it and matches the rest
+   of the file's "colour lives in bounded shapes" rule. */
+.hub__location-rent--warn {
+  display: inline-block; color: var(--ink-on-fill); background: var(--danger);
+  font-weight: 700; padding: 1px 5px; border-radius: var(--radius);
+}
+
+/* ---- energy drink (§3) — can-in-a-circle, top-right of the play area,
+   mirrors the location badge on the opposite corner. Count sits BENEATH the
+   circle rather than as an overlapping badge, per spec. ------------------- */
+.hub__energy-drink {
+  position: absolute; right: 8px; top: calc(8px + var(--hub-top-inset, 0px)); z-index: 4;
+  transition: top .2s ease;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+/* the can is the one hub control that IS a resource fill (energy-gold),
+   same "saturated shape, dark icon" move as the bottom nav and hub
+   controls row, rather than a dark circle with a tinted glyph. */
+.hub__energy-drink-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--energy); border: var(--bw) solid var(--outline);
+  box-shadow:
+    inset 0 var(--bw) 0 rgba(255, 255, 255, .55),
+    inset 0 calc(var(--bw) * -1) 0 rgba(0, 0, 0, .3),
+    var(--shadow);
+  color: var(--ink-on-fill); cursor: pointer; padding: 0;
+  transition: transform .04s linear, filter .1s linear;
+}
+.hub__energy-drink-btn:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 var(--bw) 0 rgba(0, 0, 0, .3), inset 0 calc(var(--bw) * -1) 0 rgba(255, 255, 255, .35);
+}
+.hub__energy-drink-icon { width: 18px; height: 18px; display: block; }
+/* Appearance in "V20 §D — THE DEAD KEY" at the end of this file. */
+.hub__energy-drink-btn--disabled { cursor: not-allowed; }
+.hub__energy-drink-count {
+  font-size: 9px; font-weight: 700; color: var(--ink-dim);
+  background: var(--panel); border: var(--bw) solid var(--outline); border-radius: var(--radius);
+  padding: 1px 5px; min-width: 14px; text-align: center;
+}
+
+/* ---- ghost placement (SPEC-V5 §5u) — replaces instant drop. ↻ ROTATE /
+   ✓ PLACE float either side of the ghost prop, positioned in JS from the
+   projected tile so they always track it. Hidden by default; shown only
+   while a placement is drafted. */
+.hub__ghost-btn {
+  position: absolute; top: 0; left: 0; z-index: 5;
+  transform: translate(-50%, -50%) scale(.85); opacity: 0; pointer-events: none;
+  transition: opacity .15s ease, transform .15s ease;
+  font-size: 9px; padding: 8px 10px; white-space: nowrap;
+}
+.hub__ghost-btn--show { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+
+.hub__transition-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; pointer-events: none; transition: opacity .12s ease; z-index: 6;
+}
+.hub__transition-canvas--active { opacity: 1; }
+
+.hub__packing {
+  display: none; flex-direction: column; gap: 6px; padding: 8px 8px 6px;
+  background: var(--panel); border-top: var(--bw) solid var(--outline);
+  box-shadow: inset 0 var(--bw) 0 var(--bevel-hi);
+  flex: 0 0 auto;
+}
+.hub__packing-info { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hub__packing-title { font-size: 10px; font-weight: 700; letter-spacing: .5px; color: var(--energy); }
+.hub__packing-counter { font-size: 11px; font-weight: 700; color: var(--gold); white-space: nowrap; }
+.hub__packing-actions { display: flex; gap: 6px; }
+.hub__packing-actions .btn { flex: 1; font-size: 10.5px; padding: 11px 6px; }
+.hub__packing-moveout:not(.btn--disabled) { animation: packing-ready-pulse 1.1s ease-in-out infinite; }
+@keyframes packing-ready-pulse {
+  0%, 100% { box-shadow: var(--shadow); }
+  50% { box-shadow: 0 0 0 3px var(--cash), var(--shadow); }
+}
+
+/* ---- SLEEP dim + Zzz overlay (SPEC-V3 §3) --------------------------------
+   Sits above the canvas, below the location badge, so the room (and its
+   bed prop) stays dimly visible while asleep rather than being hidden. --- */
+.hub__sleep-dim {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: rgba(4, 6, 18, .55); opacity: 0; transition: opacity .35s ease;
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  padding: 14% 8%;
+}
+.hub__sleep-dim--show { opacity: 1; }
+.hub__sleep-zzz { display: flex; gap: 4px; align-items: flex-end; }
+/* V16: a blurred colour glow on type is the exact pattern the brief bans.
+   A hard, unblurred outline shadow reads as bold comic lettering instead —
+   fits the reference art and the rest of this file's hard-shadow world. */
+.hub__sleep-zzz span {
+  font-size: 20px; font-weight: 700; color: var(--views); opacity: 0;
+  text-shadow: 1.5px 1.5px 0 var(--outline);
+  animation: sleep-zzz-float 2.6s ease-in-out infinite;
+}
+.hub__sleep-zzz span:nth-child(1) { font-size: 14px; animation-delay: 0s; }
+.hub__sleep-zzz span:nth-child(2) { font-size: 18px; animation-delay: .5s; }
+.hub__sleep-zzz span:nth-child(3) { font-size: 22px; animation-delay: 1s; }
+@keyframes sleep-zzz-float {
+  0%   { opacity: 0; transform: translate(0, 6px) rotate(-6deg); }
+  15%  { opacity: .9; }
+  75%  { opacity: .7; }
+  100% { opacity: 0; transform: translate(-14px, -26px) rotate(-6deg); }
+}
+
+/* ---- TOP BANNER STACK — moved off the .hub flex column (SPEC-V14 §1,
+   following §30's precedent for hub__edit-tray). NIGHT and ROOM-INCOMPLETE
+   used to be `flex: 0 0 auto` siblings of hub__canvas-wrap in the .hub
+   column, so showing either one STOLE HEIGHT from the room and squashed it
+   vertically. Now both live inside hub__canvas-wrap (position: relative) as
+   an absolutely-positioned overlay anchored to the top edge — the canvas
+   itself never resizes; only the sky is covered a little. Sits above the
+   canvas, below the ghost placement buttons (z-index 5) and the corner
+   controls (z-index 4), since those visually sit UNDER the banner stack
+   once it pushes them down (see --hub-top-inset below) and should never be
+   covered by it while both are settling into place. */
+.hub__top-banners {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 3;
+  display: flex; flex-direction: column;
+}
+
+/* ---- NIGHT banner (SPEC-V3 §3) — awake-at-night nudge to go SLEEP -------- */
+.hub__night-banner {
+  display: none; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 10px; background: var(--panel-lo); border-bottom: var(--bw) solid var(--outline);
+}
+.hub__night-banner--show { display: flex; }
+/* font-size 9px, not the 9.5px used elsewhere in this file, specifically so
+   this fits on one line with a safety margin at 420px width — see hard
+   constraint: "keep the banner text on a single line ... shrink the font
+   slightly if needed." overflow/ellipsis is a defensive fallback only, not
+   the normal case, and doesn't affect this element's height (so the
+   measured --hub-top-inset stays correct even if it ever triggers). */
+.hub__night-banner-text {
+  font-size: 9px; color: var(--views); letter-spacing: .2px; flex: 1 1 auto;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- ROOM INCOMPLETE banner (SPEC-V5 §5r/§5u) — same shape as the NIGHT
+   banner, warning-colored, listing exactly what's missing and what it
+   blocks. Both banners can show at once (stacked in DOM order inside
+   hub__top-banners) since an incomplete room and nighttime are independent
+   conditions — --hub-top-inset accounts for however many are visible. */
+.hub__room-banner {
+  display: none; align-items: center; gap: 8px;
+  padding: 7px 10px; background: var(--panel-lo); border-bottom: var(--bw) solid var(--outline);
+}
+.hub__room-banner--show { display: flex; }
+/* This copy ("ROOM INCOMPLETE — MISSING ...") is long enough (listing every
+   missing piece) that it can still exceed 420px even at the smallest
+   legible size, e.g. when the whole minimum room is missing on a brand-new
+   save. white-space: nowrap + ellipsis (not wrapping) is the deliberate
+   choice there: a truncated single line keeps this banner's height fixed,
+   which is what --hub-top-inset's measurement depends on; wrapping would
+   grow the banner and, same as the original bug, eat into the room again. */
+/* This one WRAPS, unlike the night banner. Its whole job is naming which
+   pieces are missing, and that list is the only thing the player can act on —
+   truncating it with an ellipsis hides exactly the information the banner
+   exists to deliver. Wrapping is safe here for two reasons that did not hold
+   before this banner became an overlay: the canvas no longer resizes when the
+   banner grows (it is absolutely positioned, so a taller banner just covers a
+   little more sky), and --hub-top-inset is MEASURED from offsetHeight rather
+   than assumed, so a two-line banner pushes the corner controls down by
+   exactly the right amount. */
+.hub__room-banner-text {
+  font-size: 9px; color: var(--danger); letter-spacing: .2px; flex: 1 1 auto;
+  line-height: 1.35;
+}
+
+/* ---- ASLEEP panel (SPEC-V3 §3) — takes over the hub's bottom slot (which,
+   since SPEC-V17 §1 deleted the control row, is otherwise unoccupied) and
+   mirrors hub__packing's layout so that slot reads consistently. --------- */
+/* V22 (owner item 8): "when you go to sleep, the main view of the room gets
+   squished because of the ASLEEP tab that appears."
+
+   It was `flex: 0 0 auto` inside .hub's flex COLUMN, sitting next to
+   .hub__canvas-wrap (`flex: 1 1 auto`). Adding a ~90px panel to that column
+   takes 90px off the canvas, so the room re-fits itself smaller the instant
+   you sleep and springs back when you wake — the room visibly jumps twice per
+   night for a panel that is only chrome.
+
+   This is the SAME defect SPEC-V14 §1 already fixed for the top banner stack
+   (see the .hub__top-banners note further up): the answer there was to take
+   the element out of the flex column entirely, and it is the answer here.
+   Anchored to .hub's bottom edge instead, so it overlays the foot of the room
+   rather than resizing it. z-index 7 clears .hub__sleep-dim (3) and the
+   transition canvas (6) so the panel stays readable through the sleep dim.
+
+   NOTE: .hub__packing directly above still has the original `flex: 0 0 auto`
+   and squishes the room the same way during a move-out. Left alone because it
+   was not what was reported and the packing flow measures that slot, but it
+   is the identical bug if it ever needs fixing. */
+.hub__sleep {
+  display: none; flex-direction: column; gap: 6px; padding: 8px 10px 8px;
+  background: var(--panel); border-top: var(--bw) solid var(--outline);
+  box-shadow: inset 0 var(--bw) 0 var(--bevel-hi);
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 7;
+}
+.hub__sleep-info { display: flex; align-items: center; justify-content: space-between; }
+.hub__sleep-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--views); }
+.hub__sleep-energy { font-size: 11px; font-weight: 700; color: var(--energy); }
+.hub__sleep-bar {
+  width: 100%; height: 10px; background: var(--panel-lo);
+  border: var(--bw) solid var(--outline);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, .45);
+  border-radius: var(--radius); overflow: hidden;
+}
+.hub__sleep-bar-fill { height: 100%; width: 0%; background: var(--energy); transition: width .3s linear; }
+/* SKIP NIGHT — WATCH A SHORT AD (SPEC-V4 §1): sits beside WAKE UP so the
+   player always has a real way out of a long sleep, not just the timed
+   energy-gated wake. */
+.hub__sleep-actions { display: flex; gap: 6px; }
+.hub__skip-night-btn { flex: 1 1 50%; font-size: 9.5px; padding: 12px 6px; }
+.hub__sleep-wake-btn { flex: 1 1 50%; font-size: 11px; padding: 12px 6px; }
+
+/* SPEC-V17 §1: the inspect popover (.hub__inspect / --show and its
+   .inspect__name / __desc / __stats / __stat children) is GONE. A short tap
+   on a prop no longer describes it — that gesture belongs to hold-to-edit
+   now — and the spec is explicit that it is removed, not left dormant.
+   The horizontal edit tray (.hub__edit-tray / --open / .hub__tray-empty)
+   is gone with it; its job moved to the phone's INVENTORY app. */
+
+/* SPEC-V17 §1 (lead cleanup): .tray-item and its children were the edit
+   tray's item chips. Package P2 deliberately left them in place in case the
+   phone's new INVENTORY app reused them, which was the right call while that
+   package was still in flight. It did not — js/phone.js styles its slots with
+   its own .phone__slot family in css/phone.css. Verified with a repo-wide
+   grep for `tray-item` returning zero JS consumers, so these are dead and are
+   removed rather than left to look load-bearing to the next reader. */
+
+/* SPEC-V17 §1: the hub's bottom control row is DELETED — .hub__controls and
+   its four buttons (.hub__edit-btn / .hub__career-btn / .hub__stats-btn /
+   .hub__sleep-btn, plus .hub__sleep-btn--locked) are gone. Because the row
+   was a `flex: 0 0 auto` sibling in the .hub column, .hub__canvas-wrap
+   (`flex: 1 1 auto`) reclaims its full height with no rule change here.
+   Where each button went: EDIT ROOM -> hold-to-edit (§2), CAREER and STATS
+   -> phone apps (§5), SLEEP -> .tb-sleep in the header (§3). */
+
+/* SPEC-V5 §21: red app-style notification dot. Generic/reusable — drop
+   `<span class="badge-dot" ...></span>` inside any `position: relative`
+   button and toggle `badge-dot--show`. */
+.badge-dot {
+  position: absolute; top: -3px; right: -3px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--danger); border: 1.5px solid var(--panel);
+  opacity: 0; transform: scale(.4); transition: opacity .15s, transform .15s;
+  pointer-events: none;
+}
+.badge-dot--show { opacity: 1; transform: scale(1); }
+
+.drag-ghost {
+  position: fixed; width: 48px; height: 48px; pointer-events: none; z-index: 999;
+  opacity: .88; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .6));
+}
+
+/* ==========================================================================
+   SHOP
+   ========================================================================== */
+.shop__tabs {
+  display: flex; gap: 4px; padding: 8px; overflow-x: auto; background: var(--panel);
+  border-bottom: var(--bw) solid var(--border); flex: 0 0 auto;
+}
+.shop__tab {
+  flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .5px; padding: 7px 11px;
+  background: var(--panel-hi); border: var(--bw) solid var(--border); border-top-color: var(--border-hi);
+  border-radius: var(--radius); color: var(--ink-dim); cursor: pointer;
+}
+.shop__tab--active { color: var(--ink); background: var(--panel-lo); border-color: var(--cash); }
+.shop__list { flex: 1 1 auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.shop__band-header {
+  margin-top: 6px; font-size: 10px; letter-spacing: 2px; color: var(--ink-dim);
+  border-bottom: 1px solid var(--border); padding-bottom: 3px;
+}
+.shop__empty { text-align: center; color: var(--ink-dim); padding: 24px; font-size: 11px; }
+
+.shop-card { display: flex; gap: 8px; padding: 8px; align-items: center; }
+.shop-card__icon-wrap {
+  flex: 0 0 auto; width: 56px; height: 56px; background: var(--panel-lo);
+  border: 1px solid var(--border); border-radius: var(--radius);
+}
+.shop-card__icon { width: 56px; height: 56px; display: block; }
+.shop-card__info { flex: 1 1 auto; min-width: 0; }
+.shop-card__name { font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+.shop-card__desc { font-size: 9.5px; color: var(--ink-dim); margin: 2px 0 4px; }
+.shop-card__stats { display: flex; gap: 4px; flex-wrap: wrap; }
+.stat-chip {
+  font-size: 9px; font-weight: 700; padding: 2px 5px; background: var(--panel-lo);
+  border: 1px solid var(--outline); border-radius: var(--radius);
+}
+.shop-card__buy { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.shop-card__price { font-size: 12px; font-weight: 700; color: var(--cash); }
+.shop-card__owned { font-size: 9px; color: var(--gold); font-weight: 700; }
+.shop-card__buybtn { font-size: 10px; padding: 7px 12px; }
+
+/* ---- STAFF (SPEC-V2 §5) -------------------------------------------------- */
+.staff-card { display: flex; gap: 8px; padding: 10px; align-items: center; }
+.staff-card--hired { border-color: var(--cash); }
+.staff-card__info { flex: 1 1 auto; min-width: 0; }
+.staff-card__name { font-size: 12px; font-weight: 700; letter-spacing: .5px; }
+.staff-card__effect { font-size: 9.5px; color: var(--ink-dim); margin: 2px 0 5px; }
+.staff-card__costs { display: flex; gap: 4px; flex-wrap: wrap; }
+.staff-card__actions { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.staff-card__hirebtn, .staff-card__firebtn { font-size: 10px; padding: 7px 12px; }
+/* V16: was danger-coloured text/border on the default panel-hi button face
+   — 2.76:1, badly under floor. FIRE is a real destructive action; it reads
+   better (and passes contrast) as a proper filled danger button anyway. */
+.staff-card__firebtn {
+  background: var(--danger); color: var(--ink-on-fill);
+  --bevel-hi: rgba(255, 255, 255, .5); --bevel-lo: rgba(0, 0, 0, .3);
+}
+
+/* ==========================================================================
+   CAREER
+   ========================================================================== */
+.career { padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1 1 auto; }
+.career__status { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.career__contract-name { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: var(--gold); }
+.career__row { display: grid; grid-template-columns: 74px 1fr 54px; align-items: center; gap: 6px; font-size: 10px; }
+.meter {
+  height: 8px; background: var(--panel-lo); border: var(--bw) solid var(--outline);
+  box-shadow: inset 0 2px 3px rgba(0, 0, 0, .4);
+  border-radius: var(--radius); overflow: hidden;
+}
+.meter__fill { height: 100%; width: 0%; transition: width .4s ease; }
+.meter__fill--subs { background: var(--subs); }
+.meter__fill--cash { background: var(--cash); }
+.meter__fill--views { background: var(--views); }
+.career__scrim-btn { font-size: 12px; padding: 13px; }
+.career__offers { display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; }
+/* V16: a colored border-left stripe is banned by the craft floor (it reads
+   as a lazy accent). The offer's colour now paints a top edge bar instead —
+   full width, sits flush against the panel's own outline. */
+.offer-card {
+  padding: 13px 10px 10px; position: relative;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.offer-card::before {
+  content: ''; position: absolute; left: -2px; right: -2px; top: -2px; height: 5px;
+  background: var(--offer-accent, var(--border-hi));
+  border: var(--bw) solid var(--outline); border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+/* V16: used to inherit --offer-accent as text colour directly — on a
+   'declining' (--danger) or sponsor (--subs) offer that measured
+   3.5-3.75:1 on the panel face. The top bar above already carries the
+   accent; the title reads in plain --ink (10.16:1) instead of repeating
+   the signal at a contrast cost. */
+.offer-card__title { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: var(--ink); }
+.offer-card__salary { font-size: 10px; color: var(--ink-dim); }
+.offer-card__requirements { display: flex; flex-direction: column; gap: 2px; }
+.req-row { font-size: 10px; font-family: var(--font); }
+.req-row--met { color: var(--cash); }
+/* V16: --danger text on the offer-card's --panel face measured 3.51:1. */
+.req-row--unmet {
+  display: inline-block; color: var(--ink-on-fill); background: var(--danger);
+  font-weight: 700; padding: 1px 5px; border-radius: var(--radius);
+}
+.offer-card__sign { align-self: flex-start; font-size: 11px; padding: 9px 18px; }
+.offer-card__badge { align-self: flex-start; font-size: 10px; padding: 3px 8px; border-radius: var(--radius); font-weight: 700; letter-spacing: .5px; }
+.offer-card__badge--current { background: var(--cash); color: var(--bg-space); }
+.offer-card__badge--done { background: var(--panel-lo); color: var(--ink-dim); }
+
+/* ==========================================================================
+   LOCATIONS (SPEC-V2 §6 / §7)
+   ========================================================================== */
+.locations { padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1 1 auto; }
+.locations__section-header {
+  margin-top: 4px; font-size: 10px; letter-spacing: 2px; color: var(--ink-dim);
+  border-bottom: 1px solid var(--border); padding-bottom: 3px;
+}
+
+/* V16: same top-edge accent bar as .offer-card — no colored border-left. */
+.loc-moving-banner { padding: 13px 10px 10px; position: relative; display: flex; flex-direction: column; gap: 6px; }
+.loc-moving-banner::before {
+  content: ''; position: absolute; left: -2px; right: -2px; top: -2px; height: 5px;
+  background: var(--energy); border: var(--bw) solid var(--outline); border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.loc-moving-banner__title { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--energy); }
+.loc-moving-banner__desc { font-size: 10px; color: var(--ink-dim); }
+
+.loc-expand { padding: 13px 10px 10px; position: relative; display: flex; flex-direction: column; gap: 7px; }
+.loc-expand::before {
+  content: ''; position: absolute; left: -2px; right: -2px; top: -2px; height: 5px;
+  background: var(--gold); border: var(--bw) solid var(--outline); border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.loc-expand__title { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--gold); }
+.loc-expand__rent { font-size: 9.5px; color: var(--ink-dim); }
+/* V16: --danger/--subs as plain text on the --panel face measured
+   3.51:1 / 3.75:1 — both under floor. Filled chips instead. */
+.loc-expand__rent--warn {
+  display: inline-block; color: var(--ink-on-fill); background: var(--danger);
+  font-weight: 700; padding: 1px 5px; border-radius: var(--radius);
+}
+.loc-expand__subs {
+  display: inline-block; font-size: 9.5px; color: var(--ink-on-fill); background: var(--subs);
+  font-weight: 700; padding: 1px 5px; border-radius: var(--radius);
+}
+.loc-expand__row { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; }
+.loc-expand__grid { color: var(--ink-dim); }
+.loc-expand__grid--after { color: var(--cash); }
+.loc-expand__arrow { color: var(--ink-dim); font-weight: 400; }
+.loc-expand__meta { font-size: 9.5px; color: var(--ink-dim); }
+.loc-expand__btn { align-self: flex-start; font-size: 11px; padding: 9px 16px; }
+
+.loc-card { padding: 10px; display: flex; flex-direction: column; gap: 7px; }
+.loc-card--current { border-color: var(--cash); }
+.loc-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.loc-card__name { font-size: 13px; font-weight: 700; letter-spacing: .5px; }
+.loc-card__tag {
+  font-size: 9px; font-weight: 700; letter-spacing: .5px; padding: 3px 7px;
+  background: var(--cash); color: var(--bg-space); border-radius: var(--radius);
+}
+.loc-card__stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.loc-stat { font-size: 10px; color: var(--ink-dim); }
+.loc-stat b { color: var(--ink); font-weight: 700; }
+.loc-stat--mult b { color: var(--views); }
+.loc-card__rentstatus { font-size: 10px; color: var(--ink-dim); }
+/* V16: same fix as .loc-expand above — chip instead of low-contrast text. */
+.loc-card__rentstatus--warn {
+  display: inline-block; color: var(--ink-on-fill); background: var(--danger);
+  font-weight: 700; padding: 1px 5px; border-radius: var(--radius);
+}
+.loc-card__subsstatus {
+  display: inline-block; font-size: 10px; color: var(--ink-on-fill); background: var(--subs);
+  font-weight: 700; padding: 1px 5px; border-radius: var(--radius);
+}
+.loc-card__movebtn { align-self: flex-start; font-size: 11px; padding: 9px 16px; }
+
+/* ==========================================================================
+   TOASTS / MODALS / FX
+   ========================================================================== */
+#toast-layer, #modal-layer, #fx-layer { position: absolute; inset: 0; }
+#toast-layer {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  pointer-events: none; z-index: 50; padding: calc(var(--topbar-h) + 10px) 10px 0;
+}
+.toast {
+  background: var(--panel-hi); border: var(--bw) solid var(--outline);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  border-radius: var(--radius); padding: 9px 14px;
+  font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--ink);
+  opacity: 0; transform: translateY(-10px); transition: opacity .25s ease, transform .25s ease;
+  max-width: 88%; text-align: center;
+}
+.toast--show { opacity: 1; transform: translateY(0); }
+/* V16: the neutral toast face stays the same panel-hi navy for all kinds —
+   only the fill for --good/--bad/--info is now a saturated chip (dark
+   ink-on-fill label) instead of a thin coloured border on a navy field,
+   matching the "colour lives in bounded shapes" rule everywhere else. */
+.toast--good { background: var(--cash); color: var(--ink-on-fill); --bevel-hi: rgba(255, 255, 255, .55); --bevel-lo: rgba(0, 0, 0, .3); }
+.toast--bad { background: var(--danger); color: var(--ink-on-fill); --bevel-hi: rgba(255, 255, 255, .5); --bevel-lo: rgba(0, 0, 0, .3); }
+.toast--info { background: var(--views); color: var(--ink-on-fill); --bevel-hi: rgba(255, 255, 255, .55); --bevel-lo: rgba(0, 0, 0, .3); }
+
+#fx-layer { pointer-events: none; z-index: 40; }
+
+#modal-layer { pointer-events: none; z-index: 60; }
+#modal-layer.modal-layer--open { pointer-events: auto; }
+.modal-backdrop {
+  position: absolute; inset: 0; background: rgba(2, 4, 14, .74);
+  display: flex; align-items: center; justify-content: center; padding: 22px;
+}
+/* V16 §3.3 — the modal frame. Three concentric edges, outside in:
+     2px --pixel-black   the hard outer cut, true black (not the house
+                         --outline) so the card separates from the darkened
+                         room behind it at any backdrop opacity;
+     1px --modal-inner   a light blue stroke just inside the black, drawn as an
+                         inset ring rather than a second element;
+     3px --radius-pixel  the corner cut-out — small enough that the corner
+                         reads as two or three stepped pixels rather than a
+                         soft radius.
+   The outer drop stays hard and unblurred (--shadow-lg), matching the props.
+   This overrides the .panel treatment the card also carries; .panel is left
+   alone because every non-modal screen in the app is built on it. */
+.reward-card {
+  width: 100%; max-width: 320px; padding: 18px; display: flex; flex-direction: column; gap: 10px;
+  opacity: 0; transform: scale(.9) translateY(10px); transition: opacity .2s ease, transform .2s ease;
+  background: var(--container-hi);
+  border: var(--bw) solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 1px var(--modal-inner),
+    var(--shadow-lg);
+}
+.reward-card--in { opacity: 1; transform: scale(1) translateY(0); }
+/* the accent (set inline via --reward-accent per call site) now paints a
+   small outlined title chip rather than just tinting text on the navy
+   card — a bounded shape again, not a glowing label. */
+/* fallback is a saturated colour (views), not the navy panel-hi — dark
+   ink-on-fill text measured 2.1:1 on panel-hi, nowhere near the 4.5:1
+   floor. Two call sites (the ad-overlay countdown card and the generic
+   confirm-card) never set --reward-accent, so the fallback has to hold up
+   on its own, not just the common case. */
+.reward-card__title {
+  font-size: 13px; font-weight: 700; letter-spacing: 1px; text-align: center;
+  color: var(--ink-on-fill); background: var(--reward-accent, var(--views));
+  border: var(--bw) solid var(--outline); border-radius: var(--radius);
+  padding: 6px 10px;
+  box-shadow: inset 0 var(--bw) 0 rgba(255, 255, 255, .5), inset 0 calc(var(--bw) * -1) 0 rgba(0, 0, 0, .3);
+}
+.reward-card__subtitle { font-size: 22px; font-weight: 700; text-align: center; color: var(--ink); letter-spacing: 2px; }
+.reward-card__body { display: flex; flex-direction: column; gap: 6px; }
+.reward-card__line { display: flex; justify-content: space-between; font-size: 12px; padding: 6px 8px; background: var(--panel-lo); border: 1px solid var(--outline); border-radius: var(--radius); }
+.reward-card__label { color: var(--ink-dim); }
+.reward-card__value { font-weight: 700; }
+.reward-card__close { margin-top: 4px; }
+.confirm-card__text { font-size: 11px; color: var(--ink-dim); text-align: center; }
+.confirm-card__actions { display: flex; gap: 8px; }
+.confirm-card__actions .btn { flex: 1; }
+
+/* ---- ENERGY / WATCH AD modal (SPEC-V3 §1) --------------------------------- */
+.energy-modal__readout {
+  text-align: center; font-size: 20px; font-weight: 700; color: var(--energy); letter-spacing: 1px;
+}
+.energy-modal__ad-btn { width: 100%; font-size: 11px; padding: 12px 8px; }
+.energy-modal__close-btn { width: 100%; font-size: 10px; padding: 9px 8px; }
+
+/* ---- TOPBAR STATS EXPLAINER + CASH AD modal (SPEC-V13 §9) ---------------
+   Same reward-card/panel/confirm-card shell as the energy modal above.
+   Four explanation rows can run tall at 420x860, so the row list scrolls
+   internally (max-height, overflow-y) rather than letting the card itself
+   push past the viewport or the page scroll horizontally. -------------- */
+.resources-modal { max-width: 340px; }
+.resources-modal__list {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 46vh; overflow-y: auto; overflow-x: hidden;
+  padding-right: 2px;
+}
+/* V16: no colored border-left — the accent already lives in the icon and
+   value colour, so the row gets the same bounded outline every other card
+   in this file gets instead of a coloured sliver down one side. */
+.resources-modal__row {
+  border: var(--bw) solid var(--outline);
+  background: var(--panel-lo);
+  border-radius: var(--radius);
+  padding: 8px 9px;
+}
+.resources-modal__row-head { display: flex; align-items: center; gap: 6px; }
+.resources-modal__icon { display: flex; flex: 0 0 auto; width: 15px; height: 15px; color: var(--row-accent, var(--ink)); }
+.resources-modal__icon svg { width: 15px; height: 15px; display: block; }
+.resources-modal__name { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--ink); flex: 1; }
+.resources-modal__value { font-size: 13px; font-weight: 700; color: var(--row-accent, var(--ink)); white-space: nowrap; }
+.resources-modal__desc { margin-top: 4px; font-size: 10.5px; line-height: 1.4; color: var(--ink-dim); }
+.resources-modal__ad-btn { width: 100%; font-size: 11px; padding: 12px 8px; margin-top: 2px; }
+
+/* ---- AD PLAYING placeholder overlay (SPEC-V3 §1) — ~3s, non-skippable ---
+   V16: the countdown used to be large glowing text on the navy card — the
+   exact "glowing type" pattern the brief bans. It now lives in a bounded,
+   outlined disc with a saturated fill and a dark number, same rule as
+   every other bright element in this file. */
+.ad-overlay__card { align-items: center; text-align: center; gap: 14px; }
+.ad-overlay__count {
+  width: 84px; height: 84px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px; font-weight: 700; letter-spacing: 0;
+  background: var(--energy); color: var(--ink-on-fill);
+  border: var(--bw) solid var(--outline); border-radius: 50%;
+  box-shadow:
+    inset 0 var(--bw) 0 rgba(255, 255, 255, .55),
+    inset 0 calc(var(--bw) * -1) 0 rgba(0, 0, 0, .3),
+    var(--shadow-lg);
+}
+.ad-overlay__hint { font-size: 10px; color: var(--ink-dim); letter-spacing: 1px; }
+
+/* ==========================================================================
+   BUTTON VARIANTS (base .btn / .btn--primary / .btn--danger / .btn--gold all
+   live in tokens.css, already carrying the correct ink-on-fill label and
+   the white/black bevel overrides for a saturated fill — measured
+   8.1-12.5:1 there. This file used to redeclare .btn--primary/--danger here
+   with a plain --bg-space label and no bevel override; since style.css
+   loads after tokens.css that silently SHADOWED the correct version on
+   every primary/danger button in the app — ghost PLACE, WAKE UP, MOVE OUT,
+   hire/fire, sign contract. Removed rather than fixed twice in two files.) */
+/* The disabled treatment for every .btn in the game is the "V20 §D — THE DEAD
+   KEY" block at the end of this file, next to the ramp it inverts. */
+
+/* ==========================================================================
+   V18 §2 — DENSE 16-BIT PIXEL UI: THE CORE PRIMITIVES
+
+   This block is deliberately LAST in the file so it lands after every V16/V17
+   rule above it, and style.css loads after tokens.css — so these overrides win
+   without needing a single !important or a bumped selector.
+
+   Nothing here is re-declared per variant. Every button in the app — including
+   the ones painted by css/teams.css, css/minigames.css, css/stats.css and
+   css/title.css, which this package does not own — gets its ramp derived from
+   whatever background it was given. That is why the two strips use
+   `background: inherit` + `filter: brightness()` instead of three hand-picked
+   colours: a new variant only ever sets its base fill.
+   ========================================================================== */
+
+/* ---- §2.2 THE 3-TONE TACTILE RAMP (never flat) ---------------------------
+     top     --btn-hi-h  strip, brightness(--btn-hi-lift)   ← lightest
+     middle  the button's own fill
+     bottom  --btn-lo-h  strip, brightness(--btn-lo-drop)   ← darkest
+   V16 already built the bottom strip as `.btn::after { background: inherit;
+   filter: brightness() }`. That construction is kept verbatim and only
+   retuned to the V18 tokens; the ::before — which used to carry the 45°
+   gloss stripe — is repurposed into the matching TOP strip, because a
+   1px diagonal glint and a 3-tone ramp are two different readings of the
+   same edge and the ramp is the one V18 asks for. `background-image: none`
+   after `background: inherit` matters: the shorthand copies the parent's
+   background-image too, and any variant that ever sets a gradient fill would
+   otherwise have that gradient re-drawn, squashed, inside a 2px strip.
+
+   The strips are painted INSIDE the padding box (V16's reasoning, still
+   true): an overhanging edge would be real overflow and could scroll a
+   420px-wide screen sideways or get clipped inside a scroll list. */
+.btn {
+  /* §2.1 — the continuous 1px TRUE-black outer outline. --outline (blue-black)
+     stays on the canvas props; chrome steps up to --pixel-black. */
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  /* the V16 inset --bevel-hi top line is dropped: the ::before strip now
+     occupies exactly that band, derived from the fill instead of from a
+     per-variant bevel token. */
+  box-shadow: 0 3px 0 var(--pixel-black);
+}
+.btn::before {
+  inset: 0 0 auto 0;
+  height: var(--btn-hi-h);
+  background: inherit;
+  background-image: none;
+  filter: brightness(var(--btn-hi-lift));
+  border-radius: var(--radius-pixel) var(--radius-pixel) 0 0;
+}
+.btn::after {
+  height: var(--btn-lo-h);
+  filter: brightness(var(--btn-lo-drop));
+  border-radius: 0 0 var(--radius-pixel) var(--radius-pixel);
+  /* scaleY, not height — §6's first hazard. transform is composited; a
+     height animation on a strip that sits inside a scrolling list would
+     reflow it on every frame of every press. */
+  transform-origin: bottom center;
+  transition: transform .04s linear;
+}
+
+/* PRESS — the sprite drops --btn-press AND the bottom strip compresses, so
+   the block reads as pushed INTO the screen rather than sliding down it.
+   The drop shadow collapses by the same amount, which keeps the button's
+   bottom edge within a pixel of where it started. tokens.css hides the strip
+   outright on :active (`opacity: 0`); opacity is restored explicitly here so
+   the compression is what reads, not a disappearance. */
+.btn:active {
+  transform: translateY(var(--btn-press));
+  box-shadow: 0 1px 0 var(--pixel-black);
+}
+.btn:active::after { opacity: 1; transform: scaleY(.34); }
+.btn:active::before { filter: brightness(1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn::after { transition: none; }
+}
+
+/* The bottom nav tiles are buttons in everything but class name — same
+   keycap construction, same ::before/::after pair — so they take the same
+   ramp rather than a parallel hand-tuned one. Their padding-bottom already
+   clears the strip band (it was sized for V16's taller 5px edge, so the 3px
+   V18 strip has room to spare and the "-20"/"FREE" cost line still lands on
+   the tile face, never on the darkened band where it measured ~2.1:1). */
+.navbtn {
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: 0 3px 0 var(--pixel-black);
+}
+.navbtn::before {
+  inset: 0 0 auto 0;
+  height: var(--btn-hi-h);
+  background: inherit;
+  background-image: none;
+  filter: brightness(var(--btn-hi-lift));
+  border-radius: var(--radius-pixel) var(--radius-pixel) 0 0;
+}
+.navbtn::after {
+  height: var(--btn-lo-h);
+  filter: brightness(var(--btn-lo-drop));
+  border-radius: 0 0 var(--radius-pixel) var(--radius-pixel);
+  transform-origin: bottom center;
+  transition: transform .04s linear;
+}
+.navbtn:active {
+  transform: translateY(var(--btn-press));
+  box-shadow: 0 1px 0 var(--pixel-black);
+}
+.navbtn:active::after { opacity: 1; transform: scaleY(.34); }
+.navbtn:active::before { filter: brightness(1); }
+
+/* ---- §2.1 THE ONE-PIXEL RULE --------------------------------------------
+   Every UI element carries a continuous 1px solid --pixel-black outer
+   outline. --pixel-black is TRUE black; --outline is the blue-black that
+   js/iso.js's Iso.rampShade() uses for canvas props, and the two are NOT
+   interchangeable — the canvas edge has to stay in the palette, the chrome
+   edge has to punch out of it. Everything below moved from 2px --outline to
+   1px --pixel-black; the corner radius steps down to --radius-pixel so the
+   corner reads as two or three stepped pixels instead of a soft curve. */
+.panel,
+.toast,
+.rank-chip,
+.meter,
+.hub__location-badge,
+.hub__energy-drink-count,
+.shop-card__icon-wrap,
+.stat-chip,
+.reward-card__line,
+.resources-modal__row,
+.shop__tab {
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+}
+/* the round controls keep their 50% radius — a 1px outline on a disc is
+   still the one-pixel rule, it just does not take the pixel corner.
+   .topbar__settings and .tb-sleep LEFT this list in V18: both became square
+   tactile keys taking §2.2's ramp, and their edge/radius is declared with
+   the rest of the header at the top of this file. .rank-progress,
+   .energy-bar and .topbar__resources left the list above for the same
+   reason — the header owns their exact edge now, and the two bars are
+   deliberately square (a 7px bar with a 3px radius is mostly corner). */
+.hub__energy-drink-btn,
+.ad-overlay__count,
+.badge-dot,
+.navbtn__lock {
+  border-width: 1px;
+  border-color: var(--pixel-black);
+}
+/* .panel's V16 shadow stack rebuilt at 1px: the inner bevel pair is what
+   makes a card read as moulded rather than printed, so it is kept — only
+   the widths and the drop-shadow colour follow the black outline down. */
+.panel {
+  box-shadow:
+    inset 0 1px 0 var(--bevel-hi),
+    inset 0 -1px 0 var(--bevel-lo),
+    0 3px 0 var(--pixel-black);
+}
+.toast {
+  box-shadow:
+    inset 0 1px 0 var(--bevel-hi),
+    inset 0 -1px 0 var(--bevel-lo),
+    0 3px 0 var(--pixel-black);
+}
+/* structural dividers between the three fixed bands take the black line too,
+   so the frame reads as one drawn grid rather than a navy edge round a black
+   one. box-sizing is border-box app-wide, so dropping 2px to 1px gives these
+   bars 1px MORE content height — --topbar-h/--nav-h are unaffected. */
+/* the header's bottom edge is the one place the one-pixel rule steps UP to
+   2px: it is not an outline round an object, it is the cut that separates
+   the whole banner from the isometric world scrolling underneath it, and at
+   1px the deep-slate banner and the deep-navy world still bled together. */
+#topbar { border-bottom: 2px solid var(--pixel-black); }
+#bottomnav { border-top: 1px solid var(--pixel-black); }
+.screen-header { border-bottom: 1px solid var(--pixel-black); }
+.hub__packing, .hub__sleep { border-top: 1px solid var(--pixel-black); }
+.hub__night-banner, .hub__room-banner { border-bottom: 1px solid var(--pixel-black); }
+
+/* The three top-edge accent bars (offer / moving / expand cards) hang off
+   their panel's border box by exactly the border width. That was -2px while
+   .panel was 2px; at 1px they would overhang by a pixel on each side, which
+   is real overflow inside a 420px scroll column. */
+.offer-card::before,
+.loc-moving-banner::before,
+.loc-expand::before {
+  left: -1px; right: -1px; top: -1px;
+  border: 1px solid var(--pixel-black);
+  border-bottom: none;
+  border-radius: var(--radius-pixel) var(--radius-pixel) 0 0;
+}
+
+/* ---- §2.3 MODAL ANATOMY --------------------------------------------------
+   Three concentric edges, outside in:
+     --modal-outer   (2px) TRUE black — the hard outer cut. Thicker than the
+                     one-pixel rule on purpose: a modal is the one thing that
+                     has to separate from an arbitrary darkened screen behind
+                     it at any backdrop opacity.
+     --modal-inner-w (1px) --modal-inner — a bright blue stroke IMMEDIATELY
+                     inside the black, drawn as an inset ring rather than a
+                     second wrapper element, which is what gives the glassy
+                     encased look in the reference art.
+     --radius-pixel  (3px) stepped corner.
+   No overflow:hidden anywhere on the card: package B's close button is
+   specified to overlap the outer border, and clipping is what would silently
+   eat it. Tall modals scroll on the BACKDROP instead (below), which keeps
+   the card whole and its overlapping chrome visible. */
+.reward-card {
+  border: var(--modal-outer) solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  background: var(--modal-fill);
+  padding-top: 0;
+  box-shadow:
+    inset 0 0 0 var(--modal-inner-w) var(--modal-inner),
+    var(--shadow-lg);
+}
+/* §6: at 420x860 a modal with a long body must not push off-screen or grow
+   the page. The backdrop scrolls, so the card is never clipped and never
+   drives horizontal overflow (overflow-x pinned hidden). */
+.modal-backdrop {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* THE DOCKED HEADER TAB.
+   Every modal this app builds already puts .reward-card__title as the card's
+   FIRST child (UI.rewardCard, UI.confirmModal, the energy modal and the
+   resources modal in main.js, and title.js's two prompts), so docking that
+   existing element is what makes every modal gain a header tab today —
+   with no dependency on a class name package B has not published yet. If B
+   adds dedicated tab markup it layers on top of this rather than fighting it.
+
+   The tab full-bleeds to the card's inner highlight — negative margins equal
+   to the card padding MINUS --modal-inner-w, so the bright ring still reads
+   as a continuous line around the tab instead of being covered by it. */
+.reward-card__title {
+  margin: 0 calc(var(--modal-inner-w) - 18px) 0;
+  border: none;
+  border-bottom: 1px solid var(--pixel-black);
+  border-radius: 0;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  background: var(--reward-accent, var(--panel-lo));
+  box-shadow:
+    inset 0 var(--btn-hi-h) 0 rgba(255, 255, 255, .22),
+    inset 0 calc(var(--btn-lo-h) * -1) 0 rgba(0, 0, 0, .3);
+}
+/* the tab's own top corners follow the card's, one pixel tighter since it
+   sits inside the 1px highlight ring. */
+.reward-card__title { border-top-left-radius: 1px; border-top-right-radius: 1px; }
+/* the card's own top padding moved into the tab, so the first body element
+   needs the gap restored under it. */
+.reward-card__subtitle, .confirm-card__text { margin-top: 4px; }
+/* .ad-overlay__card sets align-items:center on the card, which would shrink
+   the tab to its text width and un-dock it. The tab opts out explicitly
+   rather than the ad card being special-cased, so any future centred modal
+   still gets a full-bleed header. */
+.reward-card__title { align-self: stretch; }
+
+/* ---- §2.5 LIST ROWS -----------------------------------------------------
+   Stacked pill rows in one outlined well: alternating --row-a/--row-b, a 1px
+   --row-divider between them, icon/label HARD LEFT and the number or action
+   HARD RIGHT. The alternation is the thing that makes a long list scannable
+   without a border round every single row, and it is why the rows sit flush
+   (gap: 0) inside a single outline instead of floating as separate cards. */
+.reward-card__body,
+.resources-modal__list {
+  gap: 0;
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  overflow: hidden;
+}
+.reward-card__line,
+.resources-modal__row {
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--row-divider);
+  background: var(--row-a);
+}
+.reward-card__line:nth-child(even),
+.resources-modal__row:nth-child(even) { background: var(--row-b); }
+.reward-card__line:last-child,
+.resources-modal__row:last-child { border-bottom: none; }
+/* hard left / hard right. .reward-card__line is already a space-between flex
+   row; this pins the two ends explicitly so a long label cannot push the
+   number off the right edge at 420px — the label truncates instead. */
+.reward-card__line {
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+.reward-card__label {
+  flex: 1 1 auto; min-width: 0; text-align: left;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.reward-card__value { flex: 0 0 auto; text-align: right; white-space: nowrap; }
+.resources-modal__name { text-align: left; }
+.resources-modal__value { margin-left: auto; }
+
+/* ---- §2.4 FULL-SCREEN MENU GROUNDS --------------------------------------
+   Never a flat field. Two --checker-size squares alternating --checker-a /
+   --checker-b, built from the standard pair of 45° repeating gradients
+   offset by half a tile — no external asset, which the project forbids.
+
+   It goes on #screen-stack rather than on .screen: the screens are
+   transparent, they slide and stack, and painting the ground once underneath
+   means the pattern never re-seeds or jumps as the router swaps screens. The
+   two tones are one step apart in value on purpose — it has to read as
+   texture under content, not as a chequerboard someone is meant to look at.
+   The hub is unaffected: .hub__canvas-wrap paints its own radial ground over
+   the top of this. */
+#screen-stack {
+  background-color: var(--checker-a);
+  background-image:
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%),
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%);
+  background-size: calc(var(--checker-size) * 2) calc(var(--checker-size) * 2);
+  background-position: 0 0, var(--checker-size) var(--checker-size);
+}
+
+/* ---- §2.6 TYPE ----------------------------------------------------------
+   Headers and button labels in --ink-head (pure white) carrying
+   text-shadow: var(--text-outline) — four 1px offset shadows rather than a
+   -webkit-only stroke, so nothing silently un-outlines in another engine.
+
+   THE ONE PLACE THIS IS DELIBERATELY NOT APPLIED, and why: the saturated
+   button fills (--primary/--danger/--gold, the nav tiles, the coloured
+   toasts) carry a DARK --ink-on-fill label, measured 8.1-12.5:1 in
+   tokens.css. Pure white on --cash green is 1.7:1, and a 1px outline is not
+   contrast — WCAG gives it no credit. §6 names this exact trap. So white +
+   outline goes on the dark-faced elements, where it is a genuine lift over
+   --ink, and the saturated fills keep the dark ink that was measured.
+   The reference art agrees: its header tabs and panel titles are white type
+   on a DARK bar, not on the coloured chips. */
+.screen-header__title,
+.reward-card__subtitle,
+.career__contract-name,
+.offer-card__title,
+.loc-card__name,
+.shop-card__name,
+.staff-card__name,
+.loc-expand__title,
+.hub__location-name,
+.btn {
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+/* saturated faces opt back out — see the note above. Variants declared in
+   the four stylesheets this package does not own already set their own
+   `color`, and those files load after this one, so only the shadow needs
+   clearing here. */
+.btn--primary, .btn--danger, .btn--gold,
+.btn--title-primary, .staff-card__firebtn,
+.offer-card__leave,
+.navbtn__label, .navbtn__cost,
+.toast--good, .toast--bad, .toast--info {
+  text-shadow: none;
+}
+.btn--primary, .btn--danger, .btn--gold, .staff-card__firebtn { color: var(--ink-on-fill); }
+
+/* The docked header tab reads as the reference art's does: a DARK bar with
+   white outlined type. The per-call-site --reward-accent is not thrown away
+   — it moves to a solid 3px rule along the tab's bottom edge, so the signal
+   survives as a bounded shape while the label keeps its 14:1 contrast
+   instead of the ~1.9:1 white-on-cyan it would have had on the accent fill. */
+/* --panel-hi, NOT --panel-lo: --modal-fill resolves to --container, which IS
+   --panel-lo, so a "recessed" tab would have been the exact same colour as
+   the card body and disappeared. The tab is the raised value instead. */
+.reward-card__title {
+  background: var(--panel-hi);
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  border-bottom: 3px solid var(--reward-accent, var(--modal-inner));
+  box-shadow:
+    inset 0 var(--btn-hi-h) 0 rgba(255, 255, 255, .14),
+    inset 0 -1px 0 var(--pixel-black);
+}
+
+/* Numbers and stats in --num-warm / --num-cool. Applied ONLY to the neutral
+   readouts: every number already painted --cash / --views / --subs / --elo
+   is carrying resource MEANING across the whole game, and recolouring those
+   to a generic warm/cool pair would delete information to gain a palette. */
+.reward-card__value { color: var(--num-warm); }
+.loc-stat b { color: var(--num-cool); }
+.stat-chip { color: var(--num-cool); }
+.loc-expand__row { color: var(--num-cool); }
+.rank-progress__label { color: var(--num-cool); }
+
+/* ==========================================================================
+   MOTION (V16 §3.4)
+
+   Two rules govern everything below, both learned the hard way in this
+   project:
+
+   1. TRANSFORM AND OPACITY ONLY. No width/height/max-height/margin/top. The
+      stream chat's max-height fade reflowed the message list on every frame
+      and made messages physically hard to tap; a transform animation is
+      composited and never touches layout.
+
+   2. NO JS. The energy can lives in js/hub.js, which this package does not
+      own, so the bob is attached to the existing .hub__energy-drink class and
+      needs no markup or script change at all.
+
+   The bob is on the WRAPPER, so the can and its count move together as one
+   floating object. That does move a tap target — so the animation pauses
+   while the can is being pressed (:has), and the amplitude is a slow ±4px,
+   which is well inside the 34px button and never walks it out from under a
+   finger the way a repositioning render loop would.
+   ========================================================================== */
+
+/* ease-in-out between the two extremes is the standard approximation of a
+   sine bob — the eye reads the eased turnaround at the top and bottom of the
+   travel as the same thing as a real sinusoid. */
+@keyframes hub-can-bob {
+  0%   { transform: translateY(-4px); }
+  50%  { transform: translateY(4px); }
+  100% { transform: translateY(-4px); }
+}
+.hub__energy-drink { animation: hub-can-bob 2.8s ease-in-out infinite; }
+.hub__energy-drink:has(.hub__energy-drink-btn:active) { animation-play-state: paused; }
+
+/* Red notification pips (§3.4): a gentle scale breath, not a flash. The
+   keyframe starts and ends at scale(1) so the .badge-dot--show entry
+   transition still reads as a pop-in before the loop takes over, and the
+   unshown state (scale(.4), opacity 0) is untouched — no animation runs on a
+   pip that is not visible. */
+@keyframes pip-pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.badge-dot--show { animation: pip-pulse 1.8s ease-in-out .2s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hub__energy-drink,
+  .badge-dot--show { animation: none; }
+  /* The two pre-existing infinite loops in this file are dropped here too —
+     it would be strange to gate the new motion and leave those running.
+     The Zzz keyframe both moves AND fades, and its resting opacity is 0, so
+     switching it off has to restore visibility explicitly or the sleep
+     overlay silently loses its only content. */
+  .hub__packing-moveout:not(.btn--disabled) { animation: none; }
+  .hub__sleep-zzz span { animation: none; opacity: .85; }
+}
+
+/* ==========================================================================
+   V20 §D — THE DEAD KEY
+
+   Every disabled control in the game used to be `filter: grayscale()
+   brightness()`. That is not a disabled state, it is a photographic filter
+   pointed at one, and it failed in two measurable ways:
+
+     CONTRAST. The filter transforms the label and the face by the same
+     matrix, so whatever the label ends up at is an accident. Measured
+     through the exact values that were in the file:
+
+       navbtn STREAM label           1.54:1     navbtn PLAY label     2.54:1
+       .btn--danger label            2.11:1     navbtn CASES label    4.24:1
+       .btn--primary label           3.84:1     stream STOP label     3.37:1
+       .mg-cost on a blocked GO LIVE 3.70:1     .btn default label    4.51:1
+
+     Six of eight under the 4.5:1 floor, and the two that passed passed by
+     luck, not by design. tokens.css's header note about --ink-dim says the
+     quiet part out loud: lifting surfaces without re-measuring the text on
+     them is exactly the trap this project keeps walking into.
+
+     COMPOSITING. A filter promotes the element to its own render surface, so
+     its type is rasterised into a texture and then composited rather than
+     painted onto the page — one of the three causes of the blurred
+     .mg-start-btn label documented in css/minigames.css. The same is true of
+     `opacity` below 1, which is why .navbtn--soon's fade went with it.
+
+   WHAT REPLACES IT. Not a fade — an inversion. §2.2's live key is lit from
+   above and reads RAISED: bright --btn-hi-lift strip on top, dark
+   --btn-lo-drop strip below, hard black drop shadow under the whole block.
+   The dead key takes those same two ratios the other way round — dark strip
+   on top, faint rim below, and NO drop shadow — so the light falls into it
+   instead of off it and the key reads PRESSED IN AND DEAD. The three tones
+   are --dead-fill / --dead-shade / --dead-rim, all stated in tokens.css and
+   all derived from --dead-fill by the ramp's own two ratios.
+
+   The other half of the read is CHROMA, not lightness. There is no lightness
+   a disabled key could take that separates it from every ground it lands on
+   — this palette occupies one narrow value band by design — so the signal is
+   that --dead-fill's channel spread is 13 where --panel-hi's is 71 and the
+   nav hues' is 255. A locked key reads as colour REMOVED next to a live one.
+   The 1px --pixel-black outline (§2.1) is what bounds it against the ground,
+   as it bounds every other object in this world.
+
+   MEASURED, on the real composited face, with no filter in the stack:
+     --dead-ink on --dead-fill   7.35:1     (every disabled label and glyph)
+     --dead-ink on --dead-rim    6.20:1     (worst-case: the bottom strip)
+     --dead-ink on --dead-shade  8.64:1     (the top strip)
+     nav glyph on its recessed window       8.70:1
+
+   ONE BLOCK, ON PURPOSE. tokens.css and this file each used to carry their
+   own disabled rule, and the two nav/hub sites carried a third and fourth
+   variant of the same idea with different numbers. That is HANDOFF §9.1's
+   mirror pattern. The face is declared once, here, immediately after §2.6
+   sets `.btn { color: var(--ink-head) }` — which is the rule it has to land
+   after — and the call sites keep only their cursor.
+
+   The `.btn.btn--disabled` form (0,2,0) is deliberate: it outranks the
+   single-class button variants in css/teams.css, css/title.css,
+   css/stats.css and css/minigames.css, which load after this file and would
+   otherwise keep painting their live fill under a disabled label. The bare
+   `.btn--disabled` behind it catches anything that carries the class without
+   .btn. Neither needs !important.
+   ========================================================================== */
+
+.btn[disabled],
+.btn.btn--disabled,
+.btn--disabled,
+.navbtn--disabled {
+  background: var(--dead-fill);
+  color: var(--dead-ink);
+  border-color: var(--pixel-black);
+  text-shadow: var(--text-outline);
+  /* the hard black drop goes: a dead key does not stand off the board. */
+  box-shadow: none;
+  filter: none;
+  /* a dead key does not pulse either — .hub__packing-moveout's ready-pulse
+     already excluded it, this makes that true for every variant. */
+  animation: none;
+  cursor: not-allowed;
+}
+/* unchanged from the rule this block replaces: only .btn--disabled swallows
+   the tap. Natively-`disabled` buttons already cannot be clicked, and leaving
+   their pointer-events alone keeps their title tooltip reachable. */
+.btn--disabled { pointer-events: none; }
+
+/* the ramp, inverted. Explicit tones, not `background: inherit` + a
+   brightness() — deriving them would put a filter back under the key, and
+   the whole point of the pass is that there is not one. */
+.btn[disabled]::before,
+.btn.btn--disabled::before,
+.btn--disabled::before,
+.navbtn--disabled::before {
+  background: var(--dead-shade);
+  filter: none;
+}
+.btn[disabled]::after,
+.btn.btn--disabled::after,
+.btn--disabled::after,
+.navbtn--disabled::after {
+  background: var(--dead-rim);
+  filter: none;
+  opacity: 1;
+  transform: none;
+}
+
+/* A dead key cannot compress, because it is already down. js/main.js does not
+   gate onNavClick on the disabled class — the tap still fires and still
+   raises its lock toast — so the feedback is not lost, it moves to the toast
+   where the REASON is. Without this the :active rule above would hand a
+   locked tile a drop shadow it does not otherwise have. */
+.navbtn--disabled:active {
+  transform: none;
+  box-shadow: none;
+}
+.navbtn--disabled:active::after { transform: none; }
+.navbtn--disabled:active::before { filter: none; }
+
+/* The nav tile's three parts each declare their own colour, so each has to be
+   answered. Label and cost keep their `text-shadow: none` from §2.6 — at
+   8.5px and 8px a 1px black outline fattens the stems into each other, and
+   7.35:1 does not need the help. The icon keeps its recessed window: the
+   window is a shade of whatever the tile is, so it darkens with the dead face
+   for free and the glyph still measures 8.70:1 inside it. The --danger lock
+   pip is deliberately NOT drained — it is the one part of a locked tile that
+   is not the disabled state itself, it is the reason for it. */
+.navbtn--disabled .navbtn__label,
+.navbtn--disabled .navbtn__cost,
+.navbtn--disabled .navbtn__icon {
+  color: var(--dead-ink);
+}
+
+/* The energy can is the one dead control with no ::before/::after pair — it
+   is a 34px disc, not a keycap — so the same inversion is stated on its own
+   shadow stack. Live: white top inset, black bottom inset, hard drop. Dead:
+   dark top, faint rim, no drop. Its glyph is currentColor, so --dead-ink
+   carries it at the same 7.35:1. */
+.hub__energy-drink-btn--disabled {
+  background: var(--dead-fill);
+  color: var(--dead-ink);
+  border-color: var(--pixel-black);
+  box-shadow:
+    inset 0 var(--btn-hi-h) 0 var(--dead-shade),
+    inset 0 calc(var(--btn-lo-h) * -1) 0 var(--dead-rim);
+  filter: none;
+}
+.hub__energy-drink-btn--disabled:active {
+  transform: none;
+  box-shadow:
+    inset 0 var(--btn-hi-h) 0 var(--dead-shade),
+    inset 0 calc(var(--btn-lo-h) * -1) 0 var(--dead-rim);
+}
+/* and it stops bobbing. An object that is still floating is not inert. */
+.hub__energy-drink:has(.hub__energy-drink-btn--disabled) { animation: none; }
+
+/* ==========================================================================
+   ICON SWEEP — chrome for the authored-SVG glyph replacements
+   (ART-DIRECTION §2.5, V18 §3). js/career.js, js/crypto.js, js/title.js and
+   js/tournaments.js used to spend Unicode (✉ → ▲ ▼ ✓ ✗ ← ↑ ↓) on icon duty;
+   those are now drawn SVG on a 24x24 viewBox in currentColor, sized by their
+   own width/height attributes so no per-site stylesheet rule is needed.
+   Only the two things a width attribute cannot do live here.
+   ========================================================================== */
+
+/* Where the glyph was the ONLY carrier of a meaning — right vs wrong, up vs
+   down — the drawn replacement is aria-hidden and the word travels here
+   instead: read aloud, never painted. Not display:none, which would take it
+   from the accessibility tree along with the pixels. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* An icon inline with 8-13px text. inline-flex + display:block on the svg
+   removes the baseline descender gap that would otherwise push a 9px marker
+   a pixel proud of the label beside it, and centres the two optically.
+   The modifiers exist only because inline-flex overrides the alignment the
+   host rule already set (text-align on a numeric cell, on a centred column). */
+.icon-inline { display: inline-flex; align-items: center; gap: 3px; }
+.icon-inline > svg { display: block; flex: 0 0 auto; }
+.icon-inline--end { justify-content: flex-end; }
+.icon-inline--center { justify-content: center; }

@@ -1,0 +1,27 @@
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# ---- deliberately NOT published -------------------------------------------
+# Visual reference images collected while designing. They are other people's
+# artwork; republishing them on a PUBLIC repo is a copyright exposure with no
+# upside, and the game does not read them. Kept locally, just not pushed.
+inspo/
+
+# The impeccable design skill is a third-party package (Apache 2.0). It is
+# ~3.3MB of vendored code that anyone can restore in one command:
+#     npx --yes impeccable install
+# Committing a copy of someone else's package bloats the clone and adds a
+# second copy to keep in step. The HOOK CONFIG below is kept, so a fresh clone
+# still knows the project expects the skill (HANDOFF-V2 §3).
+.claude/skills/
+
+# Personal Claude Code settings (machine-specific paths, not project config).
+.claude/settings.json
+
+# ---- everything else IS source --------------------------------------------
+# No build step and no dependencies by design (HANDOFF-V2 §2), so js/, css/,
+# music/, the test suites and the docs are all source and all belong here.

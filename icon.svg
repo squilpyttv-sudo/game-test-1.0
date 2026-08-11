@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="crispEdges">
+  <!-- Authored, not a raster asset: same policy as every other icon in this
+       project (ART-DIRECTION §2.5). Flat rectangles on a coarse grid so it
+       stays crisp at any launcher size. -->
+  <rect width="512" height="512" fill="#070a16"/>
+  <rect x="96" y="150" width="320" height="24" fill="#000000"/>
+  <rect x="96" y="174" width="320" height="96" fill="#c9a06a"/>
+  <rect x="112" y="190" width="288" height="16" fill="#e8d2a4"/>
+  <rect x="128" y="270" width="32" height="120" fill="#4a3826"/>
+  <rect x="352" y="270" width="32" height="120" fill="#4a3826"/>
+  <rect x="200" y="60"  width="176" height="16" fill="#000000"/>
+  <rect x="200" y="76"  width="176" height="74" fill="#2f3754"/>
+  <rect x="216" y="92"  width="144" height="42" fill="#4b69ff"/>
+  <rect x="272" y="150" width="32"  height="24" fill="#20263e"/>
+</svg>

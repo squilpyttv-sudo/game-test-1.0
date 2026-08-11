@@ -1,0 +1,275 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/stats.css
+   The STATS screen (SPEC-V3 §7): room buffs / career / lifetime, rendered by
+   js/stats.js. Also styles the full-screen fail-state overlays (first debt
+   warning + GAME OVER card, SPEC-V3 §5) that js/stats.js owns, and is reused
+   by js/title.js's read-only "VIEW STATS" view for a dead save.
+   Uses ONLY custom properties declared in css/tokens.css.
+   ========================================================================== */
+
+.stats {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.stats__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* V18 §2.6 — section headers are white with the 1px black text outline. They
+   were --ink-dim, which made them read as captions rather than as the screen's
+   structure; the outline is what lets white sit on the dark ground without
+   looking like a glow. */
+.stats__section-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.stats__section-hint {
+  font-size: 9.5px;
+  color: var(--ink-dim);
+  margin-top: -4px;
+}
+
+/* ---- room buffs -------------------------------------------------------- */
+/* V18 §2.1 — the one-pixel rule. .panel already carries the 2px blue-black
+   house edge; this adds the continuous TRUE-black 1px line OUTSIDE it. It is a
+   box-shadow ring rather than `outline` so it follows --radius on every engine
+   and, being a shadow, adds no layout box (nothing can widen a 420px screen). */
+.stats-buff {
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    0 0 0 1px var(--pixel-black),
+    var(--shadow);
+}
+
+.stats-buff__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Label hard LEFT, value hard RIGHT (§2.5) — space-between on __head already
+   does this; the name just takes the header treatment. */
+.stats-buff__name {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+/* §2.6 — a buff figure is a stat, not money, so it takes the warm number
+   colour rather than the --cash green it was borrowing. */
+.stats-buff__value {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--num-warm);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.stats-buff__source {
+  font-size: 9px;
+  color: var(--ink-dim);
+  line-height: 1.4;
+}
+
+.stats-buff__source--empty {
+  font-style: italic;
+  opacity: .7;
+}
+
+/* ---- career / lifetime key-value rows ----------------------------------- */
+/* V18 §2.5 — THE LIST. Was a stack of individually-bevelled floating tiles
+   with a 5px gutter between them; that reads as many small cards, not as one
+   list. Now a single framed block: rows alternate --row-a / --row-b, a 1px
+   --row-divider line sits between them, and the whole stack carries one
+   continuous 1px --pixel-black outer line. Label hard left, number hard
+   right. This is the same anatomy stats, settings and the leaderboard all
+   use, so they read as one system.
+   Contrast on the new surfaces: --ink-dim measures 10.4:1 on --row-a and
+   11.4:1 on --row-b; --num-warm is 13.8:1 / 15.1:1. Both rows are DARKER than
+   the --panel-lo they replace, so nothing regressed. */
+.stats-kv-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--pixel-black), var(--shadow);
+}
+
+.stats-kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--row-a);
+  border-bottom: 1px solid var(--row-divider);
+  font-size: 10.5px;
+}
+
+.stats-kv:nth-child(even) { background: var(--row-b); }
+.stats-kv:last-child { border-bottom: 0; }
+
+.stats-kv__label {
+  color: var(--ink-dim);
+  letter-spacing: .5px;
+  text-transform: uppercase;
+}
+
+.stats-kv__value {
+  font-weight: 700;
+  color: var(--num-warm);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Tone overrides keep their meaning — red is "this is bad", green is money. */
+.stats-kv__value--warn { color: var(--danger); }
+.stats-kv__value--good { color: var(--cash); }
+
+/* ---- dead / in-debt banner (also reused by title.js's dead-slot view) ---
+   Full danger ring inset inside the .panel outline rather than a coloured
+   border-left accent stripe — the near-black outline stays intact on every
+   card and the danger state reads as a status ring around the whole shape. */
+.stats-deadbanner {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--danger),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    0 0 0 1px var(--pixel-black),
+    var(--shadow);
+}
+
+.stats-deadbanner__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--danger);
+  text-shadow: var(--text-outline);
+}
+
+.stats-deadbanner__reason {
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+
+/* ==========================================================================
+   FAIL-STATE OVERLAYS (SPEC-V3 §5) — the first debt-strike warning and the
+   GAME OVER card. Full-screen within #app (position matches #title-layer's
+   pattern), high z-index so nothing can hide behind or dismiss past them.
+   ========================================================================== */
+.fail-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  background: rgba(2, 4, 14, .92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.fail-overlay--in { opacity: 1; }
+
+.fail-overlay__card {
+  width: 100%;
+  max-width: 340px;
+  max-height: 92%;
+  overflow-y: auto;
+  /* V16 §3.3 pixel corner — this is a modal card, not a screen panel, so it
+     overrides .panel's softer --radius. */
+  border-radius: var(--radius-pixel);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Full danger ring inset inside the .panel outline — consistent with the
+   dead-banner treatment above, and reads as a much stronger "this card is
+   bad news" cue than a single recoloured top edge did. */
+.fail-overlay--warn .fail-overlay__card,
+.fail-overlay--dead .fail-overlay__card {
+  box-shadow:
+    inset 0 0 0 3px var(--danger),
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    0 0 0 1px var(--pixel-black),
+    var(--shadow-lg);
+}
+
+/* V18 §2.6 — the title was outlined with -webkit-text-stroke, which tokens.css
+   explicitly warns against: it drops out in non-WebKit engines and the header
+   silently loses its outline. Now the 4-shadow --text-outline, which every
+   engine renders, plus the hard offset drop that gave it its weight. */
+.fail-overlay__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: center;
+  color: var(--danger);
+  text-shadow: var(--text-outline), 3px 3px 0 var(--pixel-black);
+}
+
+.fail-overlay__subtitle {
+  font-size: 10.5px;
+  text-align: center;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.fail-overlay__warntext {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-align: center;
+  color: var(--danger);
+  text-shadow: var(--text-outline);
+  line-height: 1.5;
+}
+
+.fail-overlay__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 45vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.fail-overlay__btn { align-self: stretch; }
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media (max-height: 720px) {
+  .fail-overlay__title { font-size: 18px; }
+  .fail-overlay__stats { max-height: 38vh; }
+}

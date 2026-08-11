@@ -1,0 +1,628 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/phone.css
+   The in-hub phone (SPEC-V14). A new surface inside the established visual
+   world — deep-space navy grounds, chunky 2px borders, hard unblurred
+   shadows, 4px max radius, monospace uppercase, neon resource colours.
+   No second identity invented here.
+
+   TOKENS ONLY — every colour is a var(--...) from css/tokens.css. Zero raw
+   hex (verified by `grep -cE '#[0-9a-fA-F]{3,8}\b' css/phone.css` == 0).
+   ========================================================================== */
+
+/* Mounted as the LAST child of .hub__canvas-wrap (js/hub.js's buildDom()
+   calls Game.Phone.init(els.canvasWrap)). canvas-wrap already has
+   position:relative + overflow:hidden and z-index:4 siblings (the location
+   badge, energy drink, edit tray) — z-index:6 here + being last in DOM
+   order both win it the top of that stack. inset:0 covers exactly the room
+   canvas, NOT the controls row below it (a separate flex sibling of
+   canvas-wrap) — canvas-wrap's own bottom edge is that row's top edge, so
+   every "bottom: 0" below lands the phone precisely above SLEEP with no
+   measurement needed. */
+.phone {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none; /* children opt back in; the empty area never blocks room taps */
+}
+.phone--hidden { display: none; }
+
+/* dimmed hub behind the open handset — SPEC-V14 §3.2. Tapping it closes. */
+.phone__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 5, 14, .6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .16s ease;
+}
+.phone--open .phone__scrim {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity .22s ease;
+}
+
+/* invisible hit padding (SPEC-V14 §3.1: tap target >=44px tall even though
+   only 36px of the peek is drawn) — fixed at the peek's screen position
+   (unlike the handset, this never transforms), 8px of it extending upward
+   into already-visible canvas space above the drawn sliver. Inert once
+   open (the handset itself, at a different position, owns taps then) or
+   hidden. */
+.phone__hit {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  width: 300px;
+  height: 44px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.phone--open .phone__hit { pointer-events: none; }
+
+/* ---- the handset itself --------------------------------------------- */
+.phone__handset {
+  position: absolute;
+  right: 8px;
+  bottom: 0; /* = canvas-wrap's own bottom = the controls row's top edge */
+  width: 300px;
+  pointer-events: auto;
+  /* SPEC-V14 §3.4: closed = translated down so only the top 36px remains
+     on-screen, PLUS a self-clip (clip-path, not dependent on any ancestor's
+     overflow) that hides the rest outright — belt-and-suspenders, since a
+     translate-only reveal is only as good as whatever happens to clip it.
+     220ms exponential ease-out to open, 160ms plain ease back — the ONE
+     authored motion moment. */
+  transform: translateY(calc(100% - 36px));
+  clip-path: inset(0 0 calc(100% - 36px) 0);
+  transition: transform .16s ease, clip-path .16s ease;
+}
+.phone--open .phone__handset {
+  transform: translateY(0);
+  clip-path: inset(0 0 0 0);
+  transition: transform .22s cubic-bezier(.16, 1, .3, 1), clip-path .22s cubic-bezier(.16, 1, .3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Position/clip still have to change (that's what makes peek vs. open
+     different states, not decoration) but they snap instead of sliding;
+     the perceptible transition becomes the plain fade on the revealed
+     content below (.phone__stagger--reset), not a slide. */
+  .phone__handset { transition: none; }
+}
+
+.phone__body {
+  background: var(--bg-space);
+  border: 3px solid var(--outline);
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 3px 0 var(--bevel-hi),
+    inset 0 -3px 0 var(--bevel-lo),
+    var(--shadow-lg);
+  overflow: hidden;
+  padding-bottom: 10px;
+}
+
+.phone__speaker {
+  width: 40px;
+  height: 2px;
+  margin: 8px auto 6px;
+  background: var(--outline);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 var(--bevel-lo);
+}
+
+/* unread badge for the peek — SPEC-V14 §5: one dot when ANY app has a
+   notification. Redundant with per-tile dots once open, so hidden then. */
+.phone__peek-badge {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+}
+.phone--open .phone__peek-badge { display: none; }
+
+/* ---- status strip — SPEC-V14 §3.2.2 ----------------------------------- */
+.phone__status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.phone__status-net { display: inline-flex; align-items: center; gap: 4px; }
+.phone__signal-icon { width: 12px; height: 9px; color: var(--ink-dim); }
+.phone__status-right { display: inline-flex; align-items: center; gap: 5px; color: var(--ink); }
+
+/* pixel battery — THE SIGNATURE DETAIL (SPEC-V14 §0): fill = d.energy /
+   d.energyMax, colour = --energy, dropping to --danger under 20%. Only the
+   fill rect's width is ever touched from JS (js/phone.js's refresh()). */
+.phone__batt { width: 22px; height: 11px; color: var(--ink-dim); flex: 0 0 auto; }
+/* No transition here, deliberately. The fill's width is written from
+   js/phone.js on every energy change, and energy regenerates once a second —
+   a tween would run continuously for as long as the hub is open, at a
+   granularity (~1% a step) where nobody can see it. A `transform: scaleX()`
+   version was tried and measured NOT to render at all in the target engine
+   (CSS transforms are ignored on SVG child elements there), so width it is.
+   Snapping also suits a world with hard unblurred shadows and pixelated
+   rendering better than a smooth tween would. */
+.phone__batt-fill { fill: var(--energy); }
+.phone__batt-fill--low { fill: var(--danger); }
+
+/* ---- app grid — SPEC-V14 §3.2.3 --------------------------------------- */
+/* SPEC-V17 §5: six apps now (SPONSORS / SOCIAL / CRYPTO / CAREER / STATS /
+   INVENTORY) — three columns of the same 56px tile reads as a real phone
+   home screen and still measures 188px inside the 300px handset, so nothing
+   about the tile construction had to change to fit the new arrivals. */
+.phone__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 10px 10px;
+}
+
+/* V18 §5.3 / §4 — THE GRID SLOT, shared with the shop.
+   The app tile used to be a full-bleed --tile-color chip with a dark label.
+   That was its own private anatomy: the shop's slots are dark inset wells
+   with a centred sprite, so the phone and the shop read as two different
+   products. Both are now the same object —
+
+     square, --slot-fill ground, 1px --slot-border, 1px --pixel-black outer
+     outline (§2.1), sprite centred, thick --slot-sel border when selected.
+
+   The per-app identity colour does NOT disappear, it MOVES: the app's
+   --tile-color is now the colour of its icon on the dark well instead of the
+   colour of the whole tile. Worst case of the six is the cardboard brown on
+   --slot-fill at 4.93:1 — measured, and it clears the floor even though an
+   icon is not body text. The label goes --ink (white) on --slot-fill, ~15:1,
+   one treatment for all six.
+
+   The outer black outline is a box-shadow ring rather than a second border so
+   it costs no layout: at 3 x 56px + 2 x 10px = 188px inside a 300px handset
+   there is room, and .phone__body clips anyway, so nothing can overflow
+   sideways at 420x860. */
+.phone__tile {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 2px 3px;
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 2px 0 rgba(0, 0, 0, .55),
+    inset 0 -2px 0 rgba(255, 255, 255, .07);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  transition: transform .04s linear;
+}
+/* Press and "this app is open" both swap the slot's edge for a thick
+   selection ring, drawn INSET so the tile's own footprint never changes —
+   a border-width swap would relayout the icon under the finger. */
+.phone__tile:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 0 0 3px var(--slot-sel-alt);
+}
+.phone--app-inventory #phone-tile-inventory {
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 0 0 3px var(--slot-sel);
+}
+
+.phone__tile-icon { width: 26px; height: 26px; color: var(--tile-ink, var(--tile-color)); display: flex; }
+.phone__tile-icon svg { width: 100%; height: 100%; }
+
+/* SPEC-V17 §5 asked for WHITE icons on CAREER / STATS / INVENTORY back when
+   every tile was a saturated fill. On the dark well the opposite is true —
+   white would erase exactly the three identities it was protecting — so the
+   override now only survives as the LOCKED dim, which every tile shares. */
+.phone__tile--light-icon.phone__tile--locked { --tile-ink: var(--ink-dim); }
+.phone__tile-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.phone__tile-dot { position: absolute; top: -3px; right: -3px; z-index: 2; }
+
+.phone__tile-meter {
+  display: none;
+  width: 44px;
+  height: 3px;
+  background: var(--panel-lo);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 1px;
+}
+.phone__tile-meter-fill { display: block; height: 100%; width: 0%; background: var(--tile-color); }
+
+/* ---- lock screen — SPEC-V15-BATCH-C §2.2 (owner item §13) ------------
+   Below State.phoneStatus().unlocked the peek renders same as always (see
+   the `hidden` calc in js/phone.js's refresh() — only asleep/moving/EDIT
+   ROOM hide it now), but opening the handset shows THIS instead of
+   .phone__grid: the real followers/needed progress and one line of copy,
+   no app grid. .phone__lock ships in the same markup as .phone__grid
+   (js/phone.js's rootHtml()) and the two are swapped purely by CSS via
+   .phone--locked on the root, so unlocking mid-session (crossing 300
+   followers) needs no special-case JS — the very next refresh() just flips
+   the class and the swap follows for free. */
+.phone__lock {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 14px;
+  text-align: center;
+}
+.phone--locked .phone__grid { display: none; }
+.phone--locked .phone__lock { display: flex; }
+
+.phone__lock-icon {
+  width: 40px;
+  height: 40px;
+  color: var(--ink-dim);
+  filter: drop-shadow(0 2px 0 var(--outline));
+}
+.phone__lock-icon svg { width: 100%; height: 100%; }
+
+.phone__lock-progress {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  /* §2.6 — a stat, so --num-warm with the black outline rather than the
+     old soft drop shadow. Same meaning (progress toward unlock), one
+     treatment shared with every other number in the V18 UI. */
+  color: var(--num-warm);
+  text-shadow: var(--text-outline);
+}
+
+.phone__lock-meter {
+  width: 100%;
+  height: 6px;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);   /* §2.1 */
+  border-radius: var(--radius-pixel);
+  overflow: hidden;
+}
+.phone__lock-meter-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--gold);
+}
+
+.phone__lock-text {
+  font-size: 9.5px;
+  line-height: 1.4;
+  letter-spacing: .3px;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 0 var(--outline);
+}
+
+/* SPEC-V14 §3.3: locked apps are SHOWN, never hidden — desaturated, a
+   padlock glyph in place of the app icon, the unlock condition in place of
+   the label, plus this progress meter. Tapping still toasts (js/phone.js).
+   V16: unlocked tiles are now a full-saturation --tile-color fill (see
+   .phone__tile above), so "desaturated" has to mean an explicit swap back
+   to the recessed neutral well rather than a filter over a bright fill —
+   filtering a saturated fill toward gray still reads as a colour, never
+   as "off". A flat --panel-lo tile with dim ink reads unambiguously off. */
+.phone__tile--locked {
+  background: var(--panel-lo);
+  box-shadow:
+    inset 0 2px 0 var(--bevel-hi),
+    inset 0 -2px 0 var(--bevel-lo),
+    var(--shadow);
+}
+.phone__tile--locked .phone__tile-icon { color: var(--ink-dim); }
+.phone__tile--locked .phone__tile-label { font-size: 7.5px; letter-spacing: .2px; color: var(--ink-dim); }
+.phone__tile--locked .phone__tile-meter { display: block; }
+
+/* ---- INVENTORY app — SPEC-V17 §5.1 -----------------------------------
+   A PAGE OF THE HANDSET, not a G.Router screen: the phone is the game's
+   main menu now, and the stash belongs inside it the way a real phone's
+   app does. It ships in the same markup as .phone__grid (js/phone.js's
+   rootHtml()) and the two swap purely by CSS via .phone--app-inventory on
+   the root — exactly the mechanism the lock screen already uses, so no
+   second overlay and no layout written from JS.
+
+   Sizing is fixed rather than fluid on purpose: 3 x 80px + 2 x 7px gap =
+   254px inside the 300px handset (294px of usable body width), which
+   leaves the qty badges room to sit inside their slots with no horizontal
+   overflow at 420x860. */
+.phone__app {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+.phone--app-inventory .phone__grid { display: none; }
+.phone--app-inventory .phone__app { display: flex; }
+/* The lock screen outranks every app page — below 300 followers there is no
+   phone OS at all, only the unlock progress (SPEC-V15-BATCH-C §2.2). Placed
+   after the rule above so it wins at equal specificity; js/phone.js also
+   forces the page back to home while locked, belt and braces. */
+.phone--locked .phone__app { display: none; }
+
+.phone__app-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 5px;
+  border-bottom: 1px solid var(--pixel-black);   /* §2.1 */
+}
+.phone__app-back {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--panel-hi);
+  border: 1px solid var(--pixel-black);   /* §2.1 */
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo);
+  color: var(--ink);
+  cursor: pointer;
+}
+.phone__app-back svg { width: 13px; height: 13px; }
+.phone__app-back:active { box-shadow: inset 0 2px 0 var(--bevel-lo); transform: translateY(1px); }
+
+.phone__app-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+  /* §2.6 — headers are --ink-head carrying the 1px black text outline. */
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.phone__app-count {
+  margin-left: auto;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.phone__inv-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 80px);
+  justify-content: center;
+  gap: 7px;
+}
+
+/* V18 §5.3 / §4 — the inventory slot is THE SAME OBJECT as the app tile
+   above and as the shop's grid slot, one size up. It used to be a raised
+   --panel key with a 2px --outline and the bevel pair, i.e. a button; the
+   shop's slots are dark inset wells. Two anatomies for one concept is what
+   made the phone read as a separate product. Now:
+
+     square, --slot-fill ground, 1px --slot-border, 1px --pixel-black outer
+     ring (§2.1), sprite centred, thick --slot-sel-alt ring on press.
+
+   The black outline is a box-shadow ring, not a second border, so it costs
+   no layout: 3 x 80px + 2 x 7px = 254px (+1px of ring either side = 256px)
+   inside the 274px the app page leaves of a 300px handset. Nothing can
+   overflow sideways at 420x860, and .phone__body clips regardless.
+
+   An empty slot stays visibly empty rather than merely blank (SPEC-V17
+   §5.1) — same well, but the lit --slot-border is dropped for the divider
+   value and the inner top shadow deepens, so it reads as an unfilled hole
+   next to a filled one instead of as a second, dimmer item. */
+/* V19 item 8 — the slot now stacks SPRITE over NAME instead of centring the
+   sprite alone. Budget inside the 78px of content an 80px border-box slot
+   leaves: 4 pad + 44 icon + 2 gap + 18 name (2 lines x 9px) + 4 pad = 72,
+   so there is 6px of slack and nothing can push the label out of the well. */
+.phone__slot {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 3px;
+  font: inherit;
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 2px 0 rgba(0, 0, 0, .55),
+    inset 0 -2px 0 rgba(255, 255, 255, .07);
+  cursor: pointer;
+  transition: transform .04s linear;
+}
+/* Press swaps the edge for the thick selection ring, drawn INSET so the
+   slot's own footprint never changes — a border-width swap would relayout
+   the sprite under the finger. */
+.phone__slot:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 0 0 3px var(--slot-sel-alt);
+}
+.phone__slot--empty {
+  border-color: var(--row-divider);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 3px 0 rgba(0, 0, 0, .6),
+    inset 0 -1px 0 rgba(255, 255, 255, .04);
+  cursor: default;
+  pointer-events: none;
+}
+
+/* The item's REAL sprite, drawn by Game.Iso.renderPropIcon(canvas, id) —
+   the same call the shop uses. pixelated keeps the isometric art crisp at
+   this size instead of smearing it. */
+.phone__slot-icon {
+  width: 44px;
+  height: 44px;
+  display: block;
+  flex: 0 0 auto;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* The item name (V19 item 8). Clamped to two lines — the longest names in
+   the catalog ("SMALL WINDOW — BLACK RIM") need three at this size, and a
+   slot that grows to fit one item would break the grid's square rhythm.
+   The untruncated name stays on the button's title + aria-label, so
+   clamping costs no information to a screen reader. */
+.phone__slot-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  width: 100%;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 9px;
+  letter-spacing: .2px;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  pointer-events: none;
+  /* No text-shadow outline here: at 8px the 4-offset --text-outline closes
+     up the counters and the label turns to mush. The well behind it is flat
+     --slot-fill, so the outline was never earning its keep anyway. */
+  text-shadow: none;
+}
+
+/* quantity badge — TOP-right since V19 item 8; the name label now owns the
+   bottom of the slot and the badge used to sit on top of it. */
+.phone__slot-qty {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  min-width: 16px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  line-height: 13px;
+  text-align: center;
+  color: var(--ink-on-fill);
+  background: var(--gold);
+  border: 1px solid var(--pixel-black);   /* §2.1 — the one-pixel rule */
+  border-radius: var(--radius-pixel);
+  pointer-events: none;
+}
+
+/* >9 stacks paginate rather than vanishing (SPEC-V17 §5.1: never hide an
+   item with no way to reach it). Hidden entirely at <=9 so the common case
+   carries no dead chrome. */
+.phone__inv-pager {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding-top: 1px;
+}
+.phone__inv-pager--show { display: flex; }
+.phone__pager-btn {
+  width: 26px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--panel-hi);
+  border: 1px solid var(--pixel-black);   /* §2.1 */
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo);
+  color: var(--ink);
+  cursor: pointer;
+}
+.phone__pager-btn svg { width: 12px; height: 12px; }
+/* V20 §D — the pager key joins THE DEAD KEY language the rest of the game
+   now uses (css/style.css, end of file) instead of fading out.
+
+   `opacity: .35` did the same two things the game-wide `filter: grayscale()`
+   did, which is why it goes the same way: it dropped the arrow glyph from
+   8.00:1 to 2.43:1 — under even the 3:1 non-text floor, on the ONE control
+   that tells you whether more inventory exists — and it promoted the button
+   to its own render surface. Fading a control is not the same as marking it
+   dead; here it just made the arrow hard to see while leaving it looking
+   pressable.
+
+   Same inverted ramp as every other dead key: light falls INTO the face
+   (dark strip on top, faint rim below, no drop shadow) and the chroma is
+   drained rather than the lightness dropped. --dead-ink on --dead-fill
+   measures 7.35:1. */
+.phone__pager-btn:disabled {
+  cursor: default;
+  background: var(--dead-fill);
+  color: var(--dead-ink);
+  box-shadow: inset 0 2px 0 var(--dead-shade), inset 0 -2px 0 var(--dead-rim);
+}
+.phone__pager-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  color: var(--ink-dim);
+}
+
+.phone__inv-empty {
+  display: none;
+  font-size: 8.5px;
+  line-height: 1.5;
+  letter-spacing: .3px;
+  text-align: center;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 0 var(--outline);
+  padding: 2px 4px 0;
+}
+.phone__inv-empty--show { display: block; }
+
+/* ---- home bar — SPEC-V14 §3.2.4 --------------------------------------- */
+.phone__homebar {
+  display: block;
+  width: 44px;
+  height: 4px;
+  margin: 2px auto 0;
+  background: var(--border-hi);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ---- the one authored motion moment: tile + home-bar stagger-in on open
+   (SPEC-V14 §3.4) — 20ms steps, set via inline transition-delay from
+   js/phone.js's playOpenStagger(). No stagger on close (§3.4), just the
+   handset reversing — see resetStaggerInstant(). ---------------------- */
+.phone__tile,
+.phone__homebar {
+  transition: opacity .16s ease-out, transform .16s ease-out;
+}
+.phone__stagger--reset {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.phone__stagger--noanim { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .phone__tile, .phone__homebar { transition: opacity .16s ease-out; }
+  .phone__stagger--reset { transform: none; }
+}

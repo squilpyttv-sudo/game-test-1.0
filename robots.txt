@@ -1,0 +1,15 @@
+# Keep this playtest build out of search results.
+#
+# NOTE THE DELIBERATE "Allow: /". It is not a mistake and please do not
+# "fix" it to Disallow.
+#
+# Blocking the crawl would stop Google READING the page — and the page is
+# where the <meta name="robots" content="noindex"> lives. A blocked URL can
+# still be listed from an external link, just without a description, because
+# the crawler was never allowed in to see the noindex. Letting crawlers in so
+# they can read and obey the noindex is what actually keeps it out of results.
+#
+# This only covers the GitHub Pages site. It cannot hide the repository page
+# on github.com, which is public and appears on the owner's profile.
+User-agent: *
+Allow: /

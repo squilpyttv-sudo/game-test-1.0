@@ -1,0 +1,572 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/title.css
+   Front page / save-slot browser / settings. Owned by the title-screen
+   package. Uses ONLY custom properties declared in css/tokens.css.
+   ========================================================================== */
+
+#title-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;              /* visible by default — JS toggles none/flex */
+  flex-direction: column;
+  overflow: hidden;
+  /* V18 §2.4 — a full-screen menu ground is never a flat field. Two-tone
+     checkerboard from --checker-a / --checker-b at --checker-size, built
+     from gradients so it needs no external asset (this game ships with
+     zero dependencies on purpose).
+
+     The 45deg pair is the standard checker recipe: each layer paints two
+     opposite quadrants of a 2x --checker-size cell, and offsetting the
+     second layer by one cell fills the other diagonal. --checker-a is the
+     background-color underneath, so only the b-squares are drawn.
+
+     The old radial vignette is kept as the TOP layer, now translucent so
+     the checker still reads through it — it is what stops the pattern from
+     tiling flatly to all four corners and keeps the deep-navy identity. */
+  background-color: var(--checker-a);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(52, 211, 255, .10) 0%, rgba(10, 15, 34, .55) 78%),
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25% 75%, var(--checker-b) 75%),
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25% 75%, var(--checker-b) 75%);
+  background-position:
+    0 0,
+    0 0,
+    var(--checker-size) var(--checker-size);
+  background-size:
+    100% 100%,
+    calc(var(--checker-size) * 2) calc(var(--checker-size) * 2),
+    calc(var(--checker-size) * 2) calc(var(--checker-size) * 2);
+}
+
+.title-starfield {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.title-content {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px 18px;
+}
+
+/* ==========================================================================
+   MAIN MENU
+   ========================================================================== */
+.title-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  text-align: center;
+}
+
+.title-logo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1;
+}
+
+.title-logo__line1,
+.title-logo__line2 {
+  font-family: var(--font);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--ink);
+}
+
+/* V18 §2.6 — both logo lines dropped -webkit-text-stroke. tokens.css warns
+   against it explicitly: it is WebKit-only, so on any other engine the game's
+   biggest piece of type silently loses its outline. --text-outline is four
+   offset shadows and renders everywhere; the layered hard drops that give the
+   logo its depth are kept, now in TRUE black to match the chrome. */
+.title-logo__line1 {
+  font-size: 32px;
+  color: var(--elo);
+  text-shadow:
+    var(--text-outline),
+    2px 2px 0 var(--bg-space),
+    4px 4px 0 var(--pixel-black),
+    6px 6px 0 var(--pixel-black);
+  animation: title-logo-pulse 2.6s ease-in-out infinite;
+}
+
+.title-logo__line2 {
+  font-size: 44px;
+  letter-spacing: 5px;
+  color: var(--ink-head);
+  text-shadow:
+    var(--text-outline),
+    3px 3px 0 var(--views),
+    6px 6px 0 var(--pixel-black),
+    9px 9px 0 var(--pixel-black);
+}
+
+@keyframes title-logo-pulse {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.35); }
+}
+
+.title-tagline {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+
+.title-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+}
+
+/* V18 §2.2/§4 — SIZE ONLY. This block used to re-declare the whole depth
+   treatment (inset bevel pair + a bigger drop shadow) and, loading after
+   css/style.css at equal specificity, it won — which meant the title
+   screen's buttons opted out of the shared 3-tone ramp and were the one
+   place in the game where a button was built differently. The ramp is now
+   style.css's job and derives its strips from each button's own colour, so
+   all that belongs here is the title screen's larger metrics. */
+.btn--title {
+  padding: 16px 14px;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+}
+
+/* Same brightness strategy as tokens.css's .btn--primary: saturated fill,
+   near-black outline, dark ink label.
+   V18 §2.2 — the --bevel-hi/--bevel-lo pair that used to be overridden here
+   is GONE. The 3-tone ramp now lives in css/style.css and derives both
+   strips from the button's OWN background with brightness(), so a variant
+   only ever sets its base colour. Hand-picked overrides here fought that
+   ramp and produced a different edge on this one button. */
+.btn--title-primary {
+  background: var(--cash);
+  color: var(--ink-on-fill);
+}
+
+/* ==========================================================================
+   SUB-VIEWS (SAVES / SETTINGS)
+   ========================================================================== */
+.title-view {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title-view__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+/* §2.6 — every heading on this screen is --ink-head carrying the 1px black
+   text outline, the same treatment the logo lines already use. */
+.title-view__title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  text-transform: uppercase;
+}
+
+.title-back {
+  font-size: 10px;
+  padding: 8px 10px;
+  flex: 0 0 auto;
+}
+
+/* ---- saves browser ---------------------------------------------------- */
+.title-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* V18 §4 — THE SLOT CARD. The three saves are the whole point of this
+   screen, so they get the list/slot anatomy in full rather than being a
+   .panel with some text in it:
+
+     outer      a continuous 1px --pixel-black line (§2.1). The card still
+                carries .panel in markup (js/title.js, which this package
+                does not own), so the 2px --outline border it inherits is
+                overridden here rather than removed there.
+     face       --panel, with the moulded inset pair kept — a card is an
+                object sitting on the checkerboard, not a printed region.
+     well       the stats strip is a RECESSED --slot-fill trough with its
+                own 1px black line, so values read as data punched into
+                the card instead of more body copy.
+     alignment  name hard left / rank chip hard right in the head; the
+                three values distributed across the well.
+
+   The black line is a border (not a ring) so nothing about the card's
+   footprint changes, and 2px -> 1px is absorbed by the padding. */
+.title-slot-card {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+}
+
+.title-slot-card--empty {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 12px;
+}
+
+.title-slot-card__empty-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+
+.title-slot-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* §2.6 — the career name is this card's heading. */
+.title-slot-card__name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.title-slot-card__chip {
+  flex: 0 0 auto;
+  font-size: 9.5px;
+  border-width: 1px;
+  border-color: var(--pixel-black);
+}
+
+/* The inset well. Three unlabelled spans (DAY n / $n / playtime) built by
+   js/title.js — they are given equal share and 1px --row-divider rules
+   between them, which is what makes the strip read as a row of fields
+   rather than a sentence. Values in --num-cool: 13.6:1 on --slot-fill. */
+.title-slot-card__stats {
+  display: flex;
+  align-items: center;
+  padding: 6px 2px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--num-cool);
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, .55);
+}
+.title-slot-card__stats > * {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.title-slot-card__stats > * + * {
+  border-left: 1px solid var(--row-divider);
+}
+
+.title-slot-card__actions {
+  display: flex;
+  gap: 6px;
+}
+.title-slot-card__actions .btn {
+  flex: 1;
+  font-size: 9.5px;
+  padding: 9px 4px;
+}
+
+/* ---- dead saves (SPEC-V3 §5 — CAREER LOST / VIEW STATS + DELETE only) ---
+   V18: the MEANING is unchanged and must stay unmistakable — a career lost
+   to debt can never be loaded, only viewed or deleted — but the form now
+   belongs to the slot anatomy above instead of sitting on top of it:
+
+     the outer 1px black line is untouched (every object keeps its edge),
+     a 2px --danger ring rides inside it as the status colour,
+     the card's face drops to the recessed value so a lost save reads as
+       OFF next to a live one even before the ring registers, and
+     the stats well turns danger-lined with danger values.
+
+   Deliberately not done: recolouring the outer line, which would have made
+   this the only card on the screen without the house edge.
+
+   WHY :has() — measured, not preference. js/title.js never puts
+   `title-slot-card--dead` on the card; it only marks the CHIP inside it
+   (`title-slot-card__chip--dead`) and omits the PLAY button. So the
+   modifier this block was written against has never matched a single card
+   since it was authored, and the dead treatment was silently absent in the
+   browser. FIXED AT SOURCE (lead): js/title.js now adds
+   `title-slot-card--dead` to the card, so the `:has()` fallback this sweep
+   originally needed is gone and the plain class does the work. */
+.title-slot-card--dead {
+  background: var(--panel-lo);
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--danger),
+    inset 0 var(--bw) 0 var(--bevel-lo),
+    var(--shadow);
+}
+.title-slot-card--dead .title-slot-card__stats {
+  border-color: var(--danger);
+  color: var(--danger);           /* 5.9:1 on --slot-fill */
+}
+/* The chip keeps its --danger fill (js/title.js sets it inline). Its label
+   colour used to be --ink on that fill — 2.6:1, under the 4.5:1 floor for
+   9.5px type — and this rule needed `!important` to beat the inline style.
+   FIXED AT SOURCE (lead): js/title.js now sets --ink-on-fill inline on BOTH
+   chip branches (7.4:1 on --danger, and the label colour every other
+   saturated fill in the game uses), so the override is gone. */
+.title-slot-card__chip--dead {
+  border-color: var(--pixel-black);
+}
+.title-slot-card__deadreason {
+  font-size: 9.5px;
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+/* ---- read-only stats view for a dead save (content built by
+   Game.Stats.renderInto — see css/stats.css for those rules) ------------- */
+.title-stats-body {
+  padding-bottom: 6px;
+}
+
+/* ---- settings ------------------------------------------------------------ */
+/* V18 §2.5/§4 — SETTINGS AS A LIST. The rows were stacked label-above-
+   control blocks floating in a padded panel, which is the one list shape
+   the language does not have. They are now stacked pill rows: alternating
+   --row-a / --row-b, a 1px --row-divider between them, LABEL HARD LEFT and
+   the control HARD RIGHT.
+
+   The host loses its padding so the rows run corner to corner (that edge-
+   to-edge banding is what makes a list read as a list) and clips them to
+   its own rounded corners. buildSettingsPanel is shared with the in-game
+   settings modal in js/main.js, where the host is an unclassed div — the
+   row rules are self-contained so they carry over there unchanged, and
+   only the host/actions padding is scoped to this screen. */
+.title-settings-host {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--pixel-black);   /* §2.1 */
+  border-radius: var(--radius-pixel);
+}
+
+.title-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--row-a);
+  border-bottom: 1px solid var(--row-divider);
+}
+.title-setting-row:nth-of-type(even) { background: var(--row-b); }
+
+.title-setting-row__label {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-dim);   /* 6.4:1 on --row-a */
+  text-transform: uppercase;
+}
+
+.title-setting-row__control {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* §2.6 — the number at the hard right of the row. */
+.title-setting-row__val {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--num-warm);
+  text-shadow: var(--text-outline);
+  min-width: 26px;
+  text-align: right;
+}
+
+.title-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 12px;
+  /* V18: the track is a WELL, so it takes the grid slot's own ground and
+     the 1px black line every object carries (§2.1). The thumb below keeps
+     the raised light-top/dark-bottom pair, so track and thumb read as a
+     carved slot with an object sitting in it. */
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, .6);
+  cursor: pointer;
+}
+.title-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pixel);
+  background: var(--views);
+  border: 1px solid var(--pixel-black);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  cursor: pointer;
+}
+.title-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pixel);
+  background: var(--views);
+  border: 1px solid var(--pixel-black);
+  box-shadow:
+    inset 0 var(--bw) 0 var(--bevel-hi),
+    inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo),
+    var(--shadow);
+  cursor: pointer;
+}
+.title-slider::-moz-range-track {
+  height: 12px;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, .6);
+}
+
+.title-settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* Scoped to the title screen's host, which is now unpadded so its rows can
+   run edge to edge. In the in-game settings modal the host is an unclassed
+   div inside an already-padded card, so this must not apply there. */
+.title-settings-host .title-settings-actions { padding: 12px; }
+.title-settings-actions .btn { width: 100%; }
+
+/* ==========================================================================
+   OVERLAY DIALOGS (confirm / prompt) — title screen sits above #modal-layer,
+   so its own dialogs live inside #title-layer instead.
+   ========================================================================== */
+.title-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: rgba(2, 4, 14, .74);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.title-overlay--in { opacity: 1; }
+
+/* V16 §3.3 pixel corner on top of .panel's outline+bevel — this is a modal
+   card, and the reward-card/confirm family in css/style.css cuts its corners
+   the same way. */
+/* V18 §2.3 — modal anatomy: a --modal-outer black border with a 1px bright
+   --modal-inner line immediately inside it (the encased-glass look), on
+   --modal-fill. Same construction as the confirm/reward family in
+   css/style.css, so the title screen's own dialogs — which have to live
+   inside #title-layer rather than #modal-layer — are not a second kind of
+   modal. Taller-than-viewport content still scrolls internally (§6). */
+.title-overlay__card {
+  width: 100%;
+  max-width: 300px;
+  max-height: calc(100% - 44px);
+  overflow-y: auto;
+  background: var(--modal-fill);
+  border: var(--modal-outer) solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 var(--modal-inner-w) var(--modal-inner),
+    var(--shadow-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title-input {
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink);
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, .6);
+  padding: 10px 12px;
+  outline: none;
+}
+/* Focus and error keep the near-black outline and ride as an inner ring, the
+   same construction as .title-slot-card--dead below and the status rings in
+   css/teams.css. Recolouring the border removed the edge that every object
+   in the game carries and made the field read as a different component. */
+.title-input:focus {
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--views),
+    inset 0 2px 0 rgba(0, 0, 0, .6);
+}
+.title-input--err {
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--danger),
+    inset 0 2px 0 rgba(0, 0, 0, .6);
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media (max-height: 720px) {
+  .title-logo__line1 { font-size: 26px; }
+  .title-logo__line2 { font-size: 36px; }
+  .title-main { gap: 20px; }
+}

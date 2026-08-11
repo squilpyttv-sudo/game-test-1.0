@@ -1,0 +1,1566 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/teams.css (V16 REDESIGN — Package P2)
+   Package M: the TEAMS leaderboard, the CAREER offers inbox, TOURNAMENTS,
+   SHOP, SPONSORS, SOCIAL and CRYPTO. Tokens only (see css/tokens.css) — no
+   raw hex here.
+
+   V16: cards already read as objects for free everywhere the JS applies the
+   `.panel` class (see tokens.css .panel) — that combo is left alone. This
+   pass's job is everything .panel does NOT already reach: small chunky
+   tiles (team logos, category tiles, toggles), state chips/tags that need
+   to read as unmistakable filled shapes rather than tinted text, and the
+   meters, which get an explicit recessed-well + outline treatment.
+
+   --edge / --bevel below are a LOCAL composition of existing tokens.css
+   values (outline + bevel-hi/-lo), not new tokens — same 3-layer edge
+   .panel/.btn already use, just spelled once so ~40 call-sites in this file
+   don't repeat the inset box-shadow pair by hand.
+
+   V18: the edge above is now the ONE-PIXEL RULE (SPEC-V18 §2.1) — a
+   continuous 1px TRUE-black (--pixel-black) outer line on every panel, card,
+   slot and row. --outline (blue-black) stays the canvas/prop edge and is NOT
+   interchangeable with it; the only places --outline survives in this file
+   are inner bevels and the dark-well inversions where it is used as a FILL.
+   Because ~40 call-sites spell the edge as var(--edge), flipping it here
+   applies §2.1 everywhere at once instead of 40 near-identical edits.
+
+   Buttons are deliberately absent from this file's edge work: css/style.css
+   owns the 3-tone tactile ramp and derives it from each button's own
+   background, so a second copy here would fight it. Variants below set a
+   base colour ONLY. */
+:root {
+  --edge: 1px solid var(--pixel-black);
+  --bevel: inset 0 var(--bw) 0 var(--bevel-hi), inset 0 calc(var(--bw) * -1) 0 var(--bevel-lo);
+  /* V18 §4 grid slot: a square INSET well, sprite floating centred in it.
+     Selected swaps the 1px --slot-border for a thick --slot-sel / --alt,
+     painted as an inner ring so the black outer line and the footprint are
+     byte-identical in every state (the V17 lesson, one level down). */
+  --slot-well:
+    inset 0 0 0 1px var(--slot-border),
+    inset 0 2px 0 var(--pixel-black);
+  --slot-sel-ring: inset 0 0 0 3px var(--slot-sel);
+  --slot-sel-ring-alt: inset 0 0 0 3px var(--slot-sel-alt);
+  /* V17 6 - the STATUS RING. Several blocks in this file signalled state by
+     recolouring the border (border: var(--bw) solid var(--danger)), which
+     deletes the near-black outline ART-DIRECTION 2.1 puts on every object -
+     the same mistake this file's own V16 note calls out for .btn--title.
+     The ring paints the state colour just INSIDE the outline instead, which
+     is what .title-slot-card--dead, .stats-deadbanner and .case-tier--solo
+     already do. Colour comes from --ring-color, set per block. */
+  --ring: inset 0 0 0 var(--bw) var(--ring-color, var(--border));
+  /* saturated fills need a light/dark bevel pair, not the navy one */
+  --bevel-fill: inset 0 var(--bw) 0 rgba(255, 255, 255, .5), inset 0 calc(var(--bw) * -1) 0 rgba(0, 0, 0, .35);
+}
+
+/* ---- shared: team logo chip -------------------------------------------
+   Was a flat tinted square with a thin --border line. Now a small moulded
+   object: outline + top/bottom bevel + hard shadow, same recipe as .panel
+   scaled down — this is the single most-repeated shape in the file (every
+   leaderboard row, offer card, match card), so getting its edge right
+   carries the whole screen. */
+.team-logo {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  background: var(--panel-hi);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+}
+.team-logo--sm { width: 24px; height: 24px; font-size: 11px; box-shadow: var(--bevel), 0 2px 0 var(--outline); }
+.team-logo--lg { width: 44px; height: 44px; font-size: 18px; box-shadow: var(--bevel), var(--shadow-lg); }
+
+/* ---- shared: meters -----------------------------------------------------
+   .meter/.meter__fill live in style.css (sibling package) as a flat
+   panel-lo well with a 1px --border line. Every meter in THIS file also
+   carries one of the wrapper classes below, and this stylesheet loads
+   after style.css, so these win at equal specificity — no edit to
+   style.css needed. Recessed well (panel-lo) + black outline + inset
+   top-shadow so the fill sits IN a carved slot, not on a flat bar. */
+.career__rep-meter,
+.career__offers-empty-meter,
+.sponsor-card__meter,
+.social-card__meter,
+.news-card__meter {
+  border: var(--edge);
+  background: var(--panel-lo);
+  box-shadow: inset 0 var(--bw) 0 var(--outline);
+  border-radius: var(--radius);
+}
+
+/* ==========================================================================
+   TEAMS — the 100-team leaderboard
+   ========================================================================== */
+.lb-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.lb-legend {
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+  letter-spacing: .5px;
+  font-weight: 700;
+}
+
+.lb-toolbar .btn { font-size: 9.5px; padding: 8px 10px; white-space: nowrap; }
+
+/* V18 §2.5 — the leaderboard is THE list in this file, so it defines the
+   list anatomy the stat rows below borrow: rows stack FLUSH (no gap), the
+   fill alternates --row-a / --row-b, and a 1px --row-divider seam sits just
+   above the shared black edge. Rows collapse into each other by -1px so two
+   neighbours share ONE 1px black line rather than stacking two — that is
+   what keeps a 100-row list reading as one carved column instead of 100
+   floating cards. */
+.lb-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.lb-tier-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--panel-lo);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 6px 8px;
+  /* Tier colour was the left border, which deleted the black line on that
+     edge. It is an inset bar now; the outline is continuous on all four
+     sides (§2.1). */
+  border: var(--edge);
+  border-radius: var(--radius-pixel) var(--radius-pixel) 0 0;
+  box-shadow: inset 4px 0 0 currentColor, var(--bevel), var(--shadow);
+  padding-left: 12px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  margin-top: 10px;
+}
+.lb-tier-header:first-child { margin-top: 0; }
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  cursor: pointer;
+  background: var(--row-a);
+  border: var(--edge);
+  border-radius: 0;
+  /* left: the tier accent, inset so it never eats the black line.
+     bottom: the 1px --row-divider seam. */
+  box-shadow:
+    inset 3px 0 0 var(--lb-accent, var(--border)),
+    inset 0 -1px 0 var(--row-divider);
+  transition: filter .15s linear;
+}
+.lb-row:nth-child(even) { background: var(--row-b); }
+/* Collapse the shared edge: one black line between neighbours, not two. */
+.lb-row { margin-top: -1px; }
+.lb-row:last-child { border-radius: 0 0 var(--radius-pixel) var(--radius-pixel); }
+.lb-row:active { filter: brightness(1.15); }
+
+.lb-row--me {
+  background: var(--panel-hi);
+  box-shadow:
+    inset 4px 0 0 var(--slot-sel),
+    inset 0 -1px 0 var(--row-divider);
+}
+.lb-row--me:nth-child(even) { background: var(--panel-hi); }
+
+@keyframes lbFlash {
+  0%, 100% { filter: none; }
+  25%, 75% { filter: brightness(1.6); }
+}
+.lb-row--flash { animation: lbFlash 1.1s ease; }
+
+.lb-row__rank-wrap {
+  width: 30px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* §2.6 — rank and points are NUMBERS, so they take the number colours;
+   secondary stat text stays --ink-dim (measured 11:1 on --row-b). */
+.lb-row__rank {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--num-cool);
+  text-shadow: var(--text-outline);
+}
+
+.lb-row__rank-move {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 8px;
+  font-weight: 700;
+}
+.lb-row__rank-move--up { color: var(--cash); }
+.lb-row__rank-move--down { color: var(--danger); }
+.lb-row__rank-move svg { flex: 0 0 auto; display: block; }
+
+.lb-row__mid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lb-row__name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lb-row__name {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lb-row__you {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-on-fill);
+  background: var(--gold);
+  border: var(--edge);
+  padding: 1px 5px;
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+}
+
+.traj-pill {
+  align-self: flex-start;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  background: var(--slot-fill);
+  border: var(--edge);
+  box-shadow: inset 0 0 0 1px currentColor;
+  border-radius: var(--radius);
+  padding: 1px 5px;
+}
+
+/* §24 — leaderboard-only trajectory icon (fire/snowflake), replacing the
+   text pill above (still used elsewhere e.g. offer cards' traj-banner). */
+.lb-row__traj-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lb-row__traj-icon--rising { color: var(--gold); }
+.lb-row__traj-icon--declining { color: var(--views); }
+.lb-row__traj-icon svg { display: block; }
+
+.lb-row__stats {
+  flex: 0 0 auto;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lb-row__stat {
+  font-size: 9px;
+  color: var(--ink-dim);
+}
+.lb-row__stat--pts { color: var(--num-warm); font-weight: 700; text-shadow: var(--text-outline); }
+
+/* ==========================================================================
+   CAREER — nav row, offers inbox, signed-team card, objectives checklist
+   ========================================================================== */
+.career__nav-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px 0;
+}
+.career__nav-btn { flex: 1 1 0; font-size: 9.5px; padding: 9px 6px; white-space: nowrap; position: relative; }
+
+.career__section-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  margin-top: 4px;
+}
+.career__section-sub {
+  font-size: 9.5px;
+  color: var(--ink-dim);
+  line-height: 1.4;
+  margin: -4px 0 2px;
+}
+
+/* ---- shared logo/name header used by offer cards + the signed-team card */
+.offer-card__logo-row { display: flex; align-items: center; gap: 10px; }
+.offer-card__logo-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.offer-card__name { font-size: 13px; font-weight: 700; letter-spacing: .5px; color: var(--ink-head); text-shadow: var(--text-outline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.offer-card__rank { font-size: 9.5px; color: var(--ink-dim); }
+
+/* ---- the trajectory trade-off banner: the whole point, so it reads before
+   any number does. Colour comes from --offer-accent (set inline per-card). */
+.traj-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  padding: 5px 8px;
+  /* the accent (currentColor, set inline per card) rides as an inner ring so
+     the near-black outline survives - see --ring at the top of this file. */
+  border: var(--edge);
+  box-shadow: inset 0 0 0 var(--bw) currentColor;
+  border-radius: var(--radius);
+  /* V18: was --panel-lo. The trajectory accents are PRESERVED verbatim (they
+     are the offer's whole tradeoff signal), so the surface under them moves
+     instead: the darkest accent, --danger, measured 4.38:1 on --panel-lo —
+     under the 4.5 floor — and 5.49:1 on the --slot-fill well. Dropping the
+     surface fixes the contrast and matches the V18 inset-well language in
+     one move, without touching a single accent hue. */
+  background: var(--slot-fill);
+}
+
+/* §8 — offer-card trajectory indicator: icon only, no text. Reuses the
+   leaderboard's fire/snowflake icon (lb-row__traj-icon, ~13px) but scaled
+   up noticeably so it reads as the headline of the card, not a footnote. */
+.traj-banner--icon-only {
+  display: inline-flex;
+  width: auto;
+  padding: 7px 12px;
+}
+.traj-banner--icon-only .lb-row__traj-icon {
+  width: 26px;
+  height: 26px;
+}
+.traj-banner--icon-only .lb-row__traj-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* SPEC-V13 §1: offer cards now carry a line of scout-intel prose instead of
+   a lone emoji. Sentence case, wraps to 2-3 lines at 420px, colour comes
+   from the inline per-trajectory accent career.js already sets. */
+.traj-banner--text {
+  display: block;
+  width: 100%;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+  padding: 7px 10px;
+}
+
+/* §8 — exact per-offer ELO requirement line. */
+.offer-card__elo-req {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-dim);
+}
+
+/* §5 — offers-inbox empty state below the lowest tier's ELO floor: a
+   deliberate placeholder, not the old random-unsignable-teams list. */
+.career__offers-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  padding: 22px 16px;
+}
+.career__offers-empty-icon {
+  font-size: 22px;
+  color: var(--ink-dim);
+  opacity: .6;
+}
+.career__offers-empty-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.career__offers-empty-text {
+  font-size: 9.5px;
+  color: var(--ink-dim);
+  line-height: 1.4;
+  max-width: 260px;
+}
+.career__offers-empty-meter { width: 100%; max-width: 220px; margin-top: 4px; }
+.career__offers-empty-sub { font-size: 9px; color: var(--ink-dim); letter-spacing: .5px; }
+
+/* §2.5 — the money row is a stat row: label/amount hard left, the secondary
+   figure hard right, so the eye lands on the salary first every time. */
+.offer-card__money-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.offer-card__money { font-size: 14px; font-weight: 700; color: var(--cash); text-shadow: var(--text-outline); }
+.offer-card__money--dim { font-size: 10px; color: var(--ink-dim); font-weight: 400; }
+.offer-card__money--bonus { font-size: 11px; color: var(--gold); }
+
+.offer-card__meta-row { display: flex; justify-content: space-between; gap: 8px; font-size: 9.5px; color: var(--ink-dim); }
+.offer-card__meta--warn { color: var(--danger); font-weight: 700; }
+
+.offer-card__section-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--ink-dim);
+  margin-top: 2px;
+}
+
+.obj-list { display: flex; flex-direction: column; gap: 3px; }
+.obj-row { display: flex; gap: 7px; font-size: 9.5px; color: var(--danger); align-items: center; }
+.obj-row--done { color: var(--cash); }
+/* A small filled-circle status chip (matches the shop's tag chips) instead
+   of loose colored text — met/unmet reads as a shape, not a hue you have
+   to notice. */
+.obj-row__check {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 900;
+  border-radius: 50%;
+  color: var(--ink-on-fill);
+  background: var(--danger);
+  box-shadow: 0 0 0 var(--bw) var(--outline);
+}
+.obj-row--done .obj-row__check { background: var(--cash); }
+.obj-row__label { min-width: 0; }
+
+.offer-card--scout { opacity: .92; }
+.offer-card__scout-status { font-size: 9.5px; font-weight: 700; color: var(--ink-dim); }
+.offer-card__scout-status--ready { color: var(--cash); }
+
+/* V18: this re-declared .btn's box-shadow — including the `inset 0 2px 0
+   --bevel-hi` top strip, i.e. a second private copy of the button ramp.
+   css/style.css now derives the whole 3-tone ramp from each button's OWN
+   background, so the variant here sets a BASE COLOUR and nothing else and
+   the ramp follows for free. LEAVE TEAM EARLY is destructive; a red key is
+   the honest read of it. */
+/* V22 (owner item 7): "the LEAVE TEAM EARLY button looks blurry, because it is
+   already black but it has a black shadow or something." Exactly right.
+
+   `.btn` in css/style.css sets `text-shadow: var(--text-outline)` — four 1px
+   offsets in --pixel-black — for pale labels on dark keys. This variant paints
+   a saturated --danger fill and switches to the DARK --ink-on-fill label
+   (near-black by definition — it exists for exactly this case), so it was
+   drawing near-black glyphs wrapped in a black outline: the
+   outline filled the counters and merged with the strokes, which reads as
+   blur rather than as an outline.
+
+   style.css keeps ONE list of saturated-fill variants that opt back out of
+   that shadow (.btn--primary/.btn--danger/.btn--gold/...); this selector was
+   simply missing from it, and has been added there rather than being cleared
+   here, so there stays exactly one place that decides which faces are dark. */
+.offer-card__leave {
+  align-self: flex-start;
+  font-size: 10.5px;
+  padding: 8px 14px;
+  background: var(--danger);
+  color: var(--ink-on-fill);
+}
+
+.myteam-card { padding: 12px; display: flex; flex-direction: column; gap: 9px; }
+
+.contract-progress { display: flex; flex-direction: column; gap: 4px; }
+.contract-progress__label { font-size: 9.5px; color: var(--ink-dim); }
+
+/* ---- §12u — reputation block (career status panel) --------------------- */
+.career__rep-block { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.career__rep-head { display: flex; align-items: center; justify-content: space-between; }
+.career__rep-band { font-size: 9.5px; font-weight: 700; letter-spacing: .5px; }
+.career__rep-meter { position: relative; }
+.career__rep-meter-mid {
+  position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px;
+  background: var(--outline); z-index: 1;
+}
+.career__rep-meter-fill { position: relative; z-index: 0; }
+.career__rep-gating { font-size: 9px; color: var(--ink-dim); line-height: 1.4; }
+
+/* §6 — who's (or isn't) filling the scrim quota bar, so a self-filling L2/L3
+   coach never reads as a bug. Sits right under .career__row's quota bar. */
+.career__quota-coach { font-size: 9px; color: var(--ink-dim); line-height: 1.4; margin: -2px 0 4px; }
+
+/* ---- SPEC-V14 §4.2 — SPONSORS screen container --------------------------
+   The SPONSORS app now has its own screen (js/sponsors.js) rather than
+   living as a panel inside CAREER; same flex-column-with-padding shape as
+   .social/.crypto below so all three former career-nav destinations (now
+   phone apps) share one layout pattern. */
+.sponsors-screen { display: flex; flex-direction: column; gap: 10px; padding: 10px; overflow-y: auto; flex: 1 1 auto; }
+
+/* ---- SPEC-V8 A2 — sponsorship UI ----------------------------------------
+   The coach (scrim button, on CAREER) and the sponsor (this block) compete
+   for the same daily energy — that tension is why the obligation hints
+   below spell out "NOT BY SCRIMMING" rather than staying implicit. */
+.career__sponsors { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.sponsors__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sponsors__title { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--ink-head); text-shadow: var(--text-outline); }
+.sponsors__slots { font-size: 9.5px; color: var(--ink-dim); font-weight: 700; }
+.sponsors__slots--full { color: var(--gold); }
+.sponsors__week-line { font-size: 8.5px; color: var(--ink-dim); letter-spacing: .3px; }
+.sponsors__risk-banner {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .3px; color: var(--danger);
+  background: var(--panel-lo); border: var(--edge); border-radius: var(--radius);
+  --ring-color: var(--danger); box-shadow: var(--ring);
+  padding: 6px 8px;
+}
+.sponsors__empty { font-size: 10px; color: var(--ink-dim); line-height: 1.4; padding: 4px 0; }
+.sponsors__held-list { display: flex; flex-direction: column; gap: 8px; }
+.sponsors__full-note { color: var(--gold); }
+
+/* V18: the sponsor's colour was a 4px coloured border-left, which both
+   deletes the black line on that edge (§2.1) and is the exact lazy-accent
+   shape the craft floor refuses. It is an INSET bar now — same footprint,
+   black line continuous on all four sides, and the brand colour still reads
+   at a glance down the list. */
+.sponsor-card {
+  padding: 9px 10px 9px 14px;
+  border: var(--edge);
+  box-shadow: inset 4px 0 0 var(--sponsor-accent, var(--border)), var(--bevel), var(--shadow);
+  display: flex; flex-direction: column; gap: 5px;
+}
+/* At-risk needs to read before the fine print does: the whole card face
+   flips to a saturated danger fill with a dark label, not just a tinted
+   background — same "light lives in a bounded filled shape" move as the
+   buttons, applied to a whole card for the first time in this file. */
+/* V18: was retinting the shared --bevel-hi/--bevel-lo custom props locally.
+   Those feed style.css's button ramp now, so this uses --bevel-fill (this
+   file's own light/dark pair for saturated faces) as a plain box-shadow
+   instead. The red face itself is unchanged — it is the loudest thing on
+   the sponsors screen on purpose. */
+.sponsor-card--risk {
+  background: var(--danger);
+  box-shadow: var(--bevel-fill), var(--shadow);
+}
+.sponsor-card--risk .sponsor-card__name,
+.sponsor-card--risk .sponsor-card__pay,
+.sponsor-card--risk .sponsor-card__obligation,
+.sponsor-card--risk .sponsor-card__hint,
+.sponsor-card--risk .sponsor-card__progress-row,
+.sponsor-card--risk .sponsor-card__progress-val,
+.sponsor-card--risk .sponsor-card__days,
+.sponsor-card--risk .sponsor-card__miss-note {
+  color: var(--ink-on-fill);
+  /* §2.6's black text outline exists to lift LIGHT type off a mid surface.
+     On the at-risk card the type is already near-black on saturated red, so
+     the same outline just smears it — measured legibility drops. Off here,
+     on everywhere else. */
+  text-shadow: none;
+}
+.sponsor-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sponsor-card__name { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--ink-head); text-shadow: var(--text-outline); }
+.sponsor-card__pay { font-size: 12px; font-weight: 700; color: var(--cash); text-shadow: var(--text-outline); }
+.sponsor-card__flag {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .2px; border-radius: var(--radius);
+  padding: 4px 6px;
+}
+.sponsor-card__flag--warned { color: var(--ink-on-fill); background: var(--danger); border: var(--edge); }
+/* --risk only ever renders inside a .sponsor-card--risk card (whole face is
+   already the danger fill — see below), so this chip inverts to a dark
+   well with a red line instead of stacking danger-on-danger. */
+.sponsor-card__flag--risk { color: var(--danger); background: var(--outline); border: 1px solid var(--danger); }
+.sponsor-card--risk .sponsor-card__flag--warned { background: var(--outline); color: var(--danger); border-color: var(--danger); }
+.sponsor-card__obligation { font-size: 10.5px; color: var(--ink); font-weight: 700; }
+.sponsor-card__hint { font-size: 8.5px; color: var(--ink-dim); font-style: italic; }
+.sponsor-card__meter { margin-top: 2px; }
+.meter__fill--danger { background: var(--danger); }
+.sponsor-card__progress-row { display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: var(--ink-dim); }
+.sponsor-card__progress-val { color: var(--ink); font-weight: 700; }
+/* "MISS THIS WEEK -> $0 PAID" is the consequence line that makes the
+   coach-vs-sponsor tradeoff legible, and at 8.5px --ink-dim it was reading
+   as fine print. §2.6's warm number colour + the pixel outline pull it back
+   up to the weight the decision deserves. On the red at-risk face the rule
+   above still flips it to --ink-on-fill. */
+.sponsor-card__miss-note {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  color: var(--num-warm);
+  text-shadow: var(--text-outline);
+}
+.sponsor-offer-card__desc { font-size: 9.5px; color: var(--ink-dim); line-height: 1.4; }
+
+/* ---- §30u — contract extension offer card ------------------------------- */
+/* V18: was `border-left-color: var(--gold)` — dead since V16 moved
+   .offer-card's accent from a left border to the ::before top bar in
+   style.css. Sets the accent the live mechanism actually reads. */
+.offer-card--extension { --offer-accent: var(--gold); }
+.ext-compare { display: flex; align-items: center; gap: 10px; }
+.ext-compare__col { display: flex; flex-direction: column; gap: 1px; }
+.ext-compare__label { font-size: 8px; letter-spacing: .5px; color: var(--ink-dim); }
+.ext-compare__value { font-size: 13px; font-weight: 700; }
+.ext-compare__value--old { color: var(--ink-dim); text-decoration: line-through; }
+.ext-compare__value--new { color: var(--cash); }
+.ext-compare__arrow { font-size: 13px; color: var(--ink-dim); font-weight: 700; }
+.ext-bump { font-size: 10px; font-weight: 700; color: var(--gold); }
+.ext-btn-row { display: flex; gap: 8px; margin-top: 2px; }
+.ext-btn-row__accept { flex: 1 1 0; font-size: 10.5px; padding: 10px 6px; }
+.ext-btn-row__decline { flex: 1 1 0; font-size: 10.5px; padding: 10px 6px; color: var(--ink-dim); }
+
+/* ---- §27u — promotion/relegation banner (independent overlay, NOT the
+   shared #modal-layer — see js/career.js installTierChangeHook() for why) */
+.promo-banner {
+  position: fixed;
+  left: 50%;
+  top: -160px;
+  transform: translateX(-50%);
+  width: min(360px, calc(100% - 24px));
+  max-height: calc(100% - 28px);
+  overflow-y: auto;
+  z-index: 200;
+  background: var(--panel);
+  /* outline stays black; gold/red is a ring inside it (was border-color) */
+  border: var(--edge);
+  border-radius: var(--radius-pixel);
+  --ring-color: var(--gold);
+  box-shadow: var(--ring), var(--bevel), var(--shadow-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  text-align: center;
+  /* V17 6: this slid in by transitioning `top`, a LAYOUT property, on a
+     position:fixed card that lands over live UI. Same distance, same easing,
+     driven by transform - no reflow, and the --in class toggle from
+     js/career.js is unchanged. */
+  top: 14px;
+  transform: translate(-50%, calc(-100% - 24px));
+  transition: transform .35s cubic-bezier(.2, .9, .3, 1.2);
+}
+.promo-banner--in { transform: translate(-50%, 0); }
+.promo-banner--down { --ring-color: var(--danger); }
+.promo-banner__title { font-size: 14px; font-weight: 700; letter-spacing: 1px; color: var(--gold); }
+.promo-banner--down .promo-banner__title { color: var(--danger); }
+.promo-banner__sub { font-size: 10.5px; color: var(--ink-dim); }
+.promo-banner__row { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
+.promo-banner__salary-old { color: var(--ink-dim); text-decoration: line-through; }
+.promo-banner__salary-new { color: var(--cash); }
+.promo-banner__arrow { color: var(--ink-dim); }
+.promo-banner__close {
+  margin-top: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  border: var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel-hi);
+  box-shadow: var(--bevel);
+  color: var(--ink);
+  cursor: pointer;
+}
+.promo-banner__close:active { transform: translateY(2px); box-shadow: none; }
+
+/* ==========================================================================
+   TOURNAMENTS — calendar, bracket, live match, results
+   ========================================================================== */
+.tourn { padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1 1 auto; }
+
+.tourn__empty { padding: 28px 16px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.tourn__empty-text { font-size: 11px; color: var(--ink-dim); line-height: 1.5; }
+
+.tourn__calendar { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.tourn__calendar-title { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--gold); text-shadow: var(--text-outline); }
+.tourn__calendar-sub { font-size: 9.5px; color: var(--ink-dim); }
+.tourn__calendar-live { font-size: 12px; font-weight: 700; color: var(--cash); letter-spacing: .5px; text-shadow: var(--text-outline); }
+
+.tourn__strip { display: flex; gap: 4px; align-items: center; }
+.tourn__strip-tick {
+  flex: 1 1 0;
+  height: 8px;
+  border-radius: var(--radius);
+  background: var(--panel-lo);
+  border: var(--edge);
+  box-shadow: inset 0 var(--bw) 0 var(--outline);
+  overflow: hidden;
+}
+.tourn__strip-tick-fill { height: 100%; background: var(--views); }
+
+.tourn__section-header {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+/* ---- the current/next match — the "event" moment -------------------- */
+.tourn__nextmatch { padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.tourn__nextmatch-event { font-size: 10px; letter-spacing: 1.5px; color: var(--ink-dim); }
+.tourn__nextmatch-vs { display: flex; align-items: center; gap: 14px; }
+.tourn__nextmatch-side { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 96px; }
+.tourn__nextmatch-name { font-size: 10.5px; font-weight: 700; color: var(--ink-head); text-shadow: var(--text-outline); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
+.tourn__nextmatch-rank { font-size: 9px; color: var(--ink-dim); }
+.tourn__nextmatch-x { font-size: 13px; font-weight: 700; color: var(--ink-dim); }
+.tourn__playbtn { font-size: 12px; padding: 13px 26px; }
+/* §9 — "already played today" lock state: same footprint as the PLAY
+   button so the panel doesn't jump, but visibly inert. */
+.tourn__playbtn--locked {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--ink-dim);
+  border: var(--edge);
+  border-radius: var(--radius);
+  background: var(--panel-lo);
+  box-shadow: inset 0 var(--bw) 0 var(--outline);
+  letter-spacing: .5px;
+}
+.tourn__nextmatch-lockedsub { font-size: 9px; color: var(--ink-dim); text-align: center; }
+
+/* ---- bracket rounds -----------------------------------------------------
+   Previously bare flex groups floating on the screen ground with only a
+   left-border accent per row — no card at all. Each round is now its own
+   moulded object (the .panel recipe, spelled out here since js/tournaments
+   builds .tourn__bracket without a "panel" class); match rows stay flat
+   list rows INSIDE that one card rather than becoming cards themselves. */
+.tourn__bracket { display: flex; flex-direction: column; gap: 12px; }
+.tourn__round {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--panel);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+  padding: 8px 10px 10px;
+}
+.tourn__round-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 5px;
+  margin-bottom: 2px;
+}
+/* §2.5 inside the round card: flush-stacked rows, alternating fill, a 1px
+   --row-divider seam, teams hard left and the score hard right. The 3px
+   coloured border-left is an inset bar for the same reason it is everywhere
+   else in this file — it used to delete the black line on that edge. */
+.tourn__match {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 11px;
+  font-size: 10px;
+  background: var(--row-a);
+  border: var(--edge);
+  border-radius: 0;
+  box-shadow: inset 3px 0 0 var(--border), inset 0 -1px 0 var(--row-divider);
+}
+.tourn__match + .tourn__match { margin-top: -1px; }
+.tourn__match:nth-of-type(even) { background: var(--row-b); }
+.tourn__match--you,
+.tourn__match--you:nth-of-type(even) {
+  background: var(--panel-hi);
+  box-shadow: inset 4px 0 0 var(--slot-sel), inset 0 -1px 0 var(--row-divider);
+}
+.tourn__match--pending { opacity: .55; }
+.tourn__match-side { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.tourn__match-side--winner .tourn__match-name { color: var(--cash); }
+.tourn__match-side--loser .tourn__match-name { opacity: .55; }
+.tourn__match-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
+.tourn__match-score { flex: 0 0 auto; font-weight: 700; width: 44px; text-align: center; color: var(--num-cool); text-shadow: var(--text-outline); }
+
+/* ---- last result + rank-delta board ------------------------------------ */
+.tourn__result { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.tourn__result-placement { font-size: 15px; font-weight: 700; letter-spacing: 1px; color: var(--gold); text-shadow: var(--text-outline); }
+.tourn__result-prize { font-size: 11px; color: var(--cash); font-weight: 700; text-shadow: var(--text-outline); }
+
+/* §2.5 stat rows: name hard left, delta hard right, alternating fill, 1px
+   --row-divider seam. */
+.tourn__delta-list { display: flex; flex-direction: column; gap: 0; }
+.tourn__delta-row {
+  display: flex; align-items: center; gap: 8px; font-size: 9.5px;
+  padding: 5px 6px;
+  background: var(--row-a);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+}
+.tourn__delta-row:nth-child(even) { background: var(--row-b); }
+.tourn__delta-row:last-child { box-shadow: none; }
+.tourn__delta-name { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tourn__delta-val { flex: 0 0 auto; font-weight: 700; width: 46px; text-align: right; }
+.tourn__delta-val--up { color: var(--cash); }
+.tourn__delta-val--down { color: var(--danger); }
+.tourn__delta-val--flat { color: var(--ink-dim); }
+
+.tourn__history-row {
+  display: flex; align-items: center; gap: 8px; font-size: 9.5px;
+  padding: 6px;
+  background: var(--row-a);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+}
+.tourn__history-row:nth-child(even) { background: var(--row-b); }
+.tourn__history-row:last-child { box-shadow: none; }
+.tourn__history-event { flex: 1 1 0; min-width: 0; }
+.tourn__history-event-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.tourn__history-day { color: var(--ink-dim); font-size: 8.5px; }
+.tourn__history-placement { flex: 0 0 auto; font-weight: 700; text-align: right; }
+
+.tourn__major-champion {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-on-fill);
+  background: var(--gold);
+  border: var(--edge);
+  box-shadow: var(--bevel-fill);
+  padding: 6px;
+  border-radius: var(--radius);
+}
+
+/* ==========================================================================
+   SHOP — SPEC-V15-BATCH-B §2. Category strip + filter row + a 2-column card
+   grid, one category rendered at a time.
+
+   V16: this section previously stood in for the outline/bevel system with
+   var(--bg-space) + a border-top-color trick because tokens.css didn't have
+   --outline/--bevel-hi/-lo yet. It does now — every one of those stand-ins
+   below is replaced with the real --edge/--bevel composition (see the top
+   of this file) so the shop matches the rest of the app instead of running
+   its own slightly-off placeholder edge. */
+.loc-card__stepup {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  color: var(--cash);
+  background: var(--panel-lo);
+  border: var(--edge);
+  --ring-color: var(--cash);
+  box-shadow: var(--ring);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+}
+
+/* ---- category strip ------------------------------------------------------
+   Chunky icon tiles, one per category, horizontally scrollable, never wraps
+   to a second row at 420px. */
+.shop2-catstrip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 0 0 auto;
+  background: var(--bg-deep);
+  border-bottom: var(--edge);
+}
+
+.shop2-cattile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 2px 6px;
+  font: inherit;
+  color: var(--cat-color, var(--ink-dim));
+  background: var(--panel);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+  cursor: pointer;
+  user-select: none;
+  transition: transform .04s linear;
+}
+.shop2-cattile:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 var(--bw) 0 var(--bevel-lo), inset 0 calc(var(--bw) * -1) 0 var(--bevel-hi);
+}
+/* V18: an active category is a SELECTED SLOT — the thick --slot-sel ring
+   replaces the 1px edge inside the same footprint, so the strip never
+   reflows and can never be pushed to a second row (the flex-wrap: nowrap
+   above is the other half of that guarantee). */
+.shop2-cattile--active {
+  background: var(--panel-hi);
+  box-shadow: var(--slot-sel-ring), var(--bevel), var(--shadow);
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.shop2-cattile__icon { width: 22px; height: 22px; display: block; color: var(--cat-color, var(--ink-dim)); }
+.shop2-cattile--active .shop2-cattile__icon { color: var(--cat-color, var(--slot-sel)); }
+.shop2-cattile__icon svg { width: 100%; height: 100%; display: block; }
+.shop2-cattile__label {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  white-space: nowrap;
+  color: inherit;
+}
+.shop2-cattile__badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--ink-on-fill);
+  background: var(--cash);
+  border: var(--edge);
+  border-radius: 8px;
+}
+
+/* ---- filter row: AFFORDABLE ONLY toggle + sort control ------------------- */
+.shop2-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  flex: 0 0 auto;
+}
+.shop2-toggle {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-dim);
+  background: var(--panel-lo);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+  padding: 9px 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .04s linear;
+}
+.shop2-toggle:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 var(--bw) 0 var(--bevel-lo), inset 0 calc(var(--bw) * -1) 0 var(--bevel-hi);
+}
+.shop2-toggle .shop2-icon { width: 13px; height: 13px; flex: 0 0 auto; opacity: 0; }
+/* V18: this used to retint the shared --bevel-hi/--bevel-lo custom props
+   locally. Those two names now feed css/style.css's 3-tone button ramp, so a
+   local override here fights it; the file's own --bevel-fill composition
+   (identical light/dark pair, scoped to one box-shadow) does the job without
+   touching a shared name. */
+.shop2-toggle--active {
+  color: var(--ink-on-fill);
+  background: var(--cash);
+  box-shadow: var(--bevel-fill), var(--shadow);
+}
+.shop2-toggle--active .shop2-icon { opacity: 1; }
+
+.shop2-sort {
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink);
+  background: var(--panel-hi);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+  padding: 9px 8px;
+  cursor: pointer;
+}
+
+/* ---- item grid ------------------------------------------------------------
+   2-column card grid — the actual fix for "39 items rendered at once". */
+.shop2-grid {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-content: start;
+}
+/* STAFF isn't item cards (hire/fire rows, richer than the grid shape) — one
+   column, reuses css/style.css's existing .staff-card. */
+.shop2-grid--staff { grid-template-columns: 1fr; }
+
+.shop2-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--panel-lo);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+  margin-bottom: 2px;
+}
+.shop2-summary__row { font-size: 9.5px; font-weight: 700; color: var(--ink-dim); }
+.shop2-summary__note { font-size: 8.5px; color: var(--ink-dim); line-height: 1.4; margin-top: 2px; }
+
+.shop2-band-header {
+  grid-column: 1 / -1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  /* V18 §2.6: section headers are white with the 1px black text outline. */
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  background: var(--panel-lo);
+  border: var(--edge);
+  border-radius: var(--radius);
+  box-shadow: var(--bevel), var(--shadow);
+  padding: 5px 8px;
+  margin-top: 6px;
+}
+.shop2-band-header:first-child { margin-top: 0; }
+
+.shop2-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--ink-dim);
+  padding: 28px 12px;
+  font-size: 11px;
+}
+
+/* ---- item card -------------------------------------------------------- */
+/* js/shop.js applies BOTH "shop2-card" and "panel" (SPEC-V15-BATCH-B built
+   its own border/bevel here before .panel existed — that placeholder is
+   gone now; .panel supplies the outline+bevel+shadow, this class only
+   owns layout). State (placed/owned) recolors that inherited outline. */
+.shop2-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px 8px 8px;
+  text-align: center;
+  /* V18 §2.1 one-pixel rule — .panel's 2px blue-black edge becomes the 1px
+     TRUE-black outer line every card, slot and row now shares. */
+  border: var(--edge);
+}
+/* Unaffordable items stay visible and dimmed with the price legible — never
+   hidden by default (SPEC-V15-BATCH-B §2). Only the explicit AFFORDABLE
+   ONLY toggle removes them from the grid. */
+.shop2-card--dim { opacity: .58; }
+/* State used to overwrite .panel's near-black border AND hang a 1px ring
+   OUTSIDE it, so an owned card lost its edge and grew 1px against its grid
+   neighbours. The state colour is an inner ring now; outline and footprint
+   are identical in every state.
+
+   V18: the state ring is now the GRID SELECTION ring — thick --slot-sel-alt
+   (green) for placed, --slot-sel (yellow) for owned — so a shop card and a
+   selected inventory slot read as the same object in two states. */
+.shop2-card--placed { box-shadow: var(--slot-sel-ring-alt), var(--bevel), var(--shadow); }
+.shop2-card--owned  { box-shadow: var(--slot-sel-ring), var(--bevel), var(--shadow); }
+
+.shop2-card__band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  padding: 2px 6px;
+  border-bottom-right-radius: var(--radius);
+  border-bottom: var(--edge);
+  border-right: var(--edge);
+  color: var(--ink-on-fill);
+}
+.shop2-card__band--starter { background: var(--ink-dim); }
+.shop2-card__band--pro     { background: var(--views); }
+.shop2-card__band--elite   { background: var(--gold); }
+
+/* V18 §4 THE GRID SLOT. This is the anatomy every item grid in the game now
+   shares: a SQUARE INSET well filled --slot-fill, a 1px --slot-border line
+   just inside the 1px black outer line, and the sprite floating centred with
+   air around it rather than butting the frame. The sprite is inset 4px on
+   each side for exactly that reason — a 52px well with a 52px icon in it was
+   a picture with a border, not a slot with something in it. */
+.shop2-card__icon-wrap {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--slot-fill);
+  border: var(--edge);
+  border-radius: var(--radius-pixel);
+  box-shadow: var(--slot-well);
+}
+.shop2-card__icon { width: 46px; height: 46px; display: block; }
+/* Owned / placed light the slot itself, not just the card frame. */
+.shop2-card--owned .shop2-card__icon-wrap { box-shadow: var(--slot-sel-ring); }
+.shop2-card--placed .shop2-card__icon-wrap { box-shadow: var(--slot-sel-ring-alt); }
+
+.shop2-card__name {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  line-height: 1.25;
+  min-height: 2.5em;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+.shop2-card__stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+/* .stat-chip base lives in style.css (sibling); scope the edge upgrade to
+   chips inside shop cards only, since this stylesheet loads after it. */
+.shop2-card__stats .stat-chip { background: var(--slot-fill); border: var(--edge); color: var(--num-cool); }
+
+.shop2-card__footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+}
+/* Price keeps --cash: money is colour-coded game-wide and that meaning
+   outranks §2.6's generic number colours. It gains the pixel outline so it
+   still reads as a 16-bit numeral. */
+.shop2-card__price { font-size: 12px; font-weight: 700; color: var(--cash); text-shadow: var(--text-outline); }
+
+/* OWNED / PLACED / CAN'T AFFORD keep their existing colours verbatim — they
+   are the shop's state language. Only the outer line changes to §2.1 black. */
+.shop2-card__tag {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .3px;
+  padding: 2px 5px;
+  border-radius: var(--radius);
+}
+.shop2-icon { width: 9px; height: 9px; flex: 0 0 auto; }
+.shop2-card__tag--placed { color: var(--ink-on-fill); background: var(--cash); border: var(--edge); }
+.shop2-card__tag--owned  { color: var(--ink-on-fill); background: var(--gold); border: var(--edge); }
+.shop2-card__tag--locked { color: var(--danger); background: var(--slot-fill); border: 1px solid var(--danger); }
+
+.shop2-card__cap {
+  width: 100%;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .2px;
+  color: var(--energy);
+  text-align: center;
+}
+
+.shop2-card__buybtn { width: 100%; font-size: 9.5px; padding: 8px 6px; margin-top: 2px; }
+.shop2-card__hint { font-size: 7.5px; color: var(--ink-dim); text-align: center; line-height: 1.3; }
+
+/* ==========================================================================
+   SPEC-V9 Package B2 — SOCIAL screen
+   Social media is a third master competing for the same daily energy as
+   scrims and streams: every platform card leads with its energy cost so
+   that tradeoff is legible BEFORE a post is made, and the pending-drip line
+   is the loudest thing on an unlocked card so posting reads as an
+   investment (followers arrive over days), not an instant payout.
+   ========================================================================== */
+.social { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+
+.social__summary { padding: 10px; display: flex; flex-direction: column; gap: 0; }
+.social-summary__head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; }
+.social-summary__total { font-size: 13px; font-weight: 700; letter-spacing: .5px; color: var(--ink-head); text-shadow: var(--text-outline); }
+/* §2.5 — the summary is a stat list: label hard left, number hard right,
+   alternating fill, 1px --row-divider seam. Negative side margins let the
+   rows run to the panel's inner edge so the stripes read as a stack rather
+   than as floating bars inside a card. */
+.social-summary__row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 10px;
+  margin: 0 -10px;
+  padding: 5px 10px;
+  background: var(--row-a);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+}
+.social-summary__row:nth-of-type(even) { background: var(--row-b); }
+.social-summary__val { font-weight: 700; color: var(--num-cool); text-shadow: var(--text-outline); }
+.social-summary__val--cash { color: var(--cash); }
+.social-summary__note { font-size: 8.5px; color: var(--ink-dim); line-height: 1.4; margin-top: 6px; }
+
+.social__platform-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* V18: platform accent moves from a 4px coloured border-left to an inset
+   bar — same reason as .sponsor-card. */
+.social-card {
+  padding: 9px 10px 9px 14px;
+  border: var(--edge);
+  box-shadow: inset 4px 0 0 var(--social-accent, var(--border)), var(--bevel), var(--shadow);
+  display: flex; flex-direction: column; gap: 6px;
+}
+/* V21 (TASKS-REMAINING #4) — the last `filter: grayscale()` in the game is
+   gone, and this card now speaks "V20 §D — THE DEAD KEY" (end of
+   css/style.css) like every other inactive thing.
+
+   History: locked was once `opacity: .72` on the whole card, which measured
+   too close to the 4.5:1 floor once dimmed ink-dim text blended against the
+   dimmed panel behind it. Grayscale replaced it and DID hold contrast — that
+   much was measured and true (white head 11.56 -> 11.93:1, the followers line
+   6.48 -> 5.90:1). It was never a contrast bug.
+
+   The cost was compositing. A filter promotes the element to its own render
+   surface, so an entire text-filled card was rasterised into a texture and
+   composited rather than painted — the same mechanism behind the blurred
+   .mg-start-btn label documented in css/minigames.css.
+
+   What it was actually FOR, measured rather than assumed: a locked card
+   returns early in js/social.js (buildPlatformCard, ~line 84), so it holds
+   only the name, the LOCKED chip, two ink-dim lines and the unlock meter.
+   Every one of those is already a neutral ink token, and the brand accent
+   stripe is already overridden to --ink-dim on the very next line. So the
+   filter was desaturating exactly ONE thing — the meter's --views fill — and
+   charging a whole compositing layer to do it. Naming that one element
+   directly is the narrower, cheaper, sharper fix.
+
+   --dead-ink on the meter's --panel-lo track is the dead-key read: chroma
+   REMOVED rather than lightness dimmed, and still an unmistakable progress
+   bar. No filter, so the type is painted, not composited. */
+.social-card--locked {
+  box-shadow: inset 4px 0 0 var(--ink-dim), var(--bevel), var(--shadow);
+}
+.social-card--locked .meter__fill {
+  background: var(--dead-ink);
+}
+.social-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.social-card__name { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--ink-head); text-shadow: var(--text-outline); }
+.social-card__followers { font-size: 11px; font-weight: 700; color: var(--cash); text-shadow: var(--text-outline); }
+.social-card__followers--locked {
+  font-size: 9px;
+  letter-spacing: .3px;
+  color: var(--ink-on-fill);
+  background: var(--ink-dim);
+  border: var(--edge);
+  border-radius: var(--radius);
+  padding: 2px 6px;
+}
+
+.social-card__unlock-text { font-size: 9.5px; font-weight: 700; color: var(--ink-dim); letter-spacing: .2px; }
+.social-card__meter { margin: 1px 0; }
+.social-card__unlock-sub { font-size: 8.5px; color: var(--ink-dim); }
+
+.social-card__stats { display: flex; gap: 4px; flex-wrap: wrap; }
+.social-card__stats .stat-chip { background: var(--slot-fill); border: var(--edge); color: var(--num-cool); }
+
+/* The drip line is deliberately the loudest thing on an unlocked card —
+   this is the mechanic the whole package exists to surface. */
+.social-card__drip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--slot-fill);
+  border: var(--edge);
+  --ring-color: var(--views);
+  box-shadow: var(--ring);
+  border-radius: var(--radius);
+  padding: 5px 7px;
+}
+.social-card__drip-icon { font-size: 11px; font-weight: 700; color: var(--views); }
+.social-card__drip-text { font-size: 9px; font-weight: 700; color: var(--views); line-height: 1.3; }
+
+.social-card__postbtn { font-size: 10.5px; padding: 9px 12px; }
+
+.social__manager { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.social-manager__title { font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--ink-head); text-shadow: var(--text-outline); }
+.social-manager__empty { font-size: 10px; color: var(--ink-dim); line-height: 1.4; }
+.social-manager__gobtn { align-self: flex-start; font-size: 10px; padding: 7px 12px; }
+.social-manager__name { font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--cash); }
+.social-manager__stats { display: flex; gap: 4px; flex-wrap: wrap; }
+.social-manager__note { font-size: 8.5px; color: var(--ink-dim); line-height: 1.4; font-style: italic; }
+
+/* ==========================================================================
+   SPEC-V10 Package C2 — CRYPTO screen
+   Deliberately orthogonal to the core loop: no energy readout anywhere on
+   this screen (unlike career/social, there is no cost to weigh here). The
+   news feed is the loudest section on the screen — it is the reason to
+   check back — and every coin card leads with cost basis + unrealized P/L
+   so a sell is always an informed decision, never a guess.
+   ========================================================================== */
+.crypto { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+
+/* ---- portfolio summary -------------------------------------------------- */
+.crypto-portfolio { padding: 10px; display: flex; flex-direction: column; gap: 0; }
+.crypto-portfolio__head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 6px; }
+.crypto-portfolio__total { font-size: 15px; font-weight: 700; letter-spacing: .5px; color: var(--ink-head); text-shadow: var(--text-outline); }
+/* §2.5 stat rows — label hard left, figure hard right, alternating fill,
+   1px --row-divider seam, run out to the panel's inner edge. */
+.crypto-portfolio__row {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 10px;
+  margin: 0 -10px;
+  padding: 5px 10px;
+  background: var(--row-a);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+}
+.crypto-portfolio__row:nth-of-type(even) { background: var(--row-b); }
+.crypto-portfolio__label { color: var(--ink-dim); letter-spacing: .3px; }
+.crypto-portfolio__val { font-weight: 700; color: var(--num-cool); text-shadow: var(--text-outline); }
+.crypto-portfolio__val--pos { color: var(--cash); }
+.crypto-portfolio__val--neg { color: var(--danger); }
+.crypto-portfolio__fee { font-size: 8.5px; color: var(--ink-dim); letter-spacing: .3px; margin-top: 6px; }
+
+/* ---- news feed — the heart of the system -------------------------------- */
+.crypto-news { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.crypto-news__head { display: flex; align-items: center; justify-content: space-between; }
+.crypto-news__disclaimer { font-size: 8.5px; color: var(--ink-dim); line-height: 1.4; }
+.crypto-news__list { display: flex; flex-direction: column; gap: 6px; }
+
+.news-empty { font-size: 10px; color: var(--ink-dim); line-height: 1.4; padding: 4px 0; }
+
+/* V18: the up/down accent was a 4px coloured border-left. Inset bar now, so
+   the black outer line is continuous and the direction still reads down the
+   feed at a glance. */
+.news-card {
+  padding: 8px 10px 8px 14px;
+  border: var(--edge);
+  --news-accent: var(--border);
+  box-shadow: inset 4px 0 0 var(--news-accent), var(--bevel), var(--shadow);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.news-card--up { --news-accent: var(--cash); }
+.news-card--down { --news-accent: var(--danger); }
+.news-card__head { display: flex; align-items: center; gap: 6px; }
+.news-card__coin { font-size: 10px; font-weight: 700; letter-spacing: .5px; color: var(--num-warm); text-shadow: var(--text-outline); background: var(--slot-fill); border: var(--edge); border-radius: var(--radius); padding: 1px 5px; }
+.news-card__dir { font-size: 9px; font-weight: 700; letter-spacing: .3px; }
+.news-card__dir--up { color: var(--cash); }
+.news-card__dir--down { color: var(--danger); }
+.news-card__time { margin-left: auto; font-size: 8px; color: var(--ink-dim); }
+.news-card__text { font-size: 10.5px; color: var(--ink); line-height: 1.35; }
+.news-card__meter { margin: 1px 0; }
+.news-card__meter-fill { background: var(--views); }
+.news-card__meta { font-size: 8px; color: var(--ink-dim); letter-spacing: .3px; }
+
+.news-track { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; border-top: 1px solid var(--border); }
+.news-track__empty { font-size: 9px; color: var(--ink-dim); }
+.news-track__stat { font-size: 9px; font-weight: 700; color: var(--ink-dim); letter-spacing: .2px; }
+.news-track__strip { display: flex; gap: 4px; flex-wrap: wrap; }
+.news-track__chip { font-size: 8px; font-weight: 700; letter-spacing: .2px; border-radius: var(--radius); padding: 2px 5px; background: var(--panel-lo); border: var(--edge); color: var(--ink-dim); }
+.news-track__chip--right { color: var(--ink-on-fill); background: var(--cash); border-color: var(--pixel-black); }
+.news-track__chip--wrong { color: var(--ink-on-fill); background: var(--danger); border-color: var(--pixel-black); }
+
+/* ---- coin cards ----------------------------------------------------------- */
+.crypto-coins { display: flex; flex-direction: column; gap: 8px; }
+
+.coin-card { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.coin-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.coin-card__name-wrap { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.coin-card__name { font-size: 12px; font-weight: 700; letter-spacing: .3px; color: var(--ink-head); text-shadow: var(--text-outline); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.coin-card__risk { font-size: 8px; font-weight: 700; letter-spacing: .3px; color: var(--ink-dim); }
+.coin-card__price-wrap { text-align: right; flex: 0 0 auto; }
+.coin-card__price { font-size: 13px; font-weight: 700; color: var(--num-warm); text-shadow: var(--text-outline); }
+.coin-card__change { font-size: 9px; font-weight: 700; }
+.coin-card__change--pos { color: var(--cash); }
+.coin-card__change--neg { color: var(--danger); }
+
+.coin-card__spark { display: block; width: 100%; height: 46px; }
+
+.coin-card__holdings { display: flex; flex-direction: column; gap: 2px; min-height: 14px; }
+.coin-card__hold-line { font-size: 9px; color: var(--ink-dim); letter-spacing: .2px; }
+.coin-card__hold-line--empty { font-style: italic; }
+.coin-card__pnl { font-size: 10.5px; font-weight: 700; }
+.coin-card__pnl--pos { color: var(--cash); }
+.coin-card__pnl--neg { color: var(--danger); }
+.coin-card__realized { font-size: 8.5px; color: var(--ink-dim); }
+
+.coin-card__trade { display: flex; flex-direction: column; gap: 5px; }
+.coin-card__trade-row { display: flex; align-items: center; gap: 5px; }
+.coin-card__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--num-cool);
+  background: var(--slot-fill);
+  border: var(--edge);
+  box-shadow: var(--slot-well);
+  border-radius: var(--radius-pixel);
+  padding: 8px 8px;
+}
+.coin-card__input::placeholder { color: var(--ink-dim); }
+.coin-card__quick-btn { flex: 0 0 auto; font-size: 8.5px; padding: 8px 8px; }
+.coin-card__trade-btn { flex: 0 0 auto; font-size: 9.5px; padding: 8px 12px; }
+.coin-card__trade-btn--sell { color: var(--danger); }
+.coin-card__sell-all { flex: 0 0 auto; font-size: 8.5px; padding: 8px 8px; color: var(--danger); }
+
+/* ==========================================================================
+   §6 — TOURNAMENT MATCH ANIMATION overlay. State.playTournamentMatch() has
+   already decided the final score before any of this renders; this is a
+   pure round-by-round PRESENTATION of a result that's already locked in
+   (see js/tournaments.js buildRoundSequence()/buildSchedule()). Sits above
+   the normal screen content, same containing block as #modal-layer.
+   ========================================================================== */
+.tourn-match-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 4, 14, .88);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+.tourn-match-overlay--open { pointer-events: auto; }
+.tourn-match-overlay--open.tourn-match-overlay--in { opacity: 1; }
+
+.tourn-match {
+  width: 100%;
+  max-width: 360px;
+  max-height: 100%;
+  overflow-y: auto;
+  background: var(--modal-fill);
+  /* V18 §2.3 modal anatomy: 2px black outer border followed immediately by a
+     1px bright inner highlight — the glassy encased look. Purely additive to
+     the existing box; nothing here touches the scoreboard's timing. */
+  border: var(--modal-outer) solid var(--pixel-black);
+  /* V16 3.3 pixel corner - this is the game's biggest modal. */
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    inset 0 0 0 var(--modal-inner-w) var(--modal-inner),
+    var(--bevel), var(--shadow-lg);
+  padding: 18px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.tourn-match__event {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.tourn-match__scoreboard { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; }
+.tourn-match__side { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.tourn-match__logo-slot { display: flex; }
+.tourn-match__name {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.tourn-match__score {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.tourn-match__score-sep { font-size: 20px; color: var(--ink-dim); text-shadow: none; }
+.tourn-match__score-num { min-width: 34px; text-align: center; display: inline-block; }
+
+/* §2.6 recolour ONLY — duration, easing and keyframe stops are byte-for-byte
+   what tournaments.js's round sequence was timed against. */
+@keyframes tournScorePulse {
+  0%, 100% { transform: scale(1); color: var(--ink-head); }
+  40% { transform: scale(1.4); color: var(--num-warm); }
+}
+.tourn-match__score-num--pulse { animation: tournScorePulse .32s ease; }
+
+.tourn-match__pips {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+}
+.tourn-match__pip {
+  width: 11px;
+  height: 6px;
+  border-radius: var(--radius);
+  background: var(--panel-lo);
+  border: var(--edge);
+}
+.tourn-match__pip--you { background: var(--cash); border-color: var(--pixel-black); }
+.tourn-match__pip--opp { background: var(--danger); border-color: var(--pixel-black); }
+
+.tourn-match__beat {
+  min-height: 13px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: var(--views);
+  text-align: center;
+}
+
+/* V17 6 - HALFTIME / MATCH POINT. This animated max-height, the exact shape
+   HANDOFF 9.5 blames for the stream chat's mistap bug: every frame re-laid
+   out the scoreboard above it and the SKIP button below it, and SKIP is the
+   one live tap target on screen. The slot is permanently reserved now (the
+   same trick .tourn-match__beat already uses with min-height), so nothing
+   moves; the text fades and rises with transform + opacity only. */
+.tourn-match__banner {
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-align: center;
+  color: var(--gold);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: transform .15s ease, opacity .15s ease;
+}
+.tourn-match__banner--show { opacity: 1; transform: translateY(0); }
+.tourn-match__banner--halftime { color: var(--views); }
+.tourn-match__banner--matchpoint { color: var(--gold); }
+
+.tourn-match__skip {
+  align-self: center;
+  font-size: 10px;
+  padding: 8px 24px;
+  margin-top: 2px;
+}

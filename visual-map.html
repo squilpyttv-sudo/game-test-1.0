@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CS2 PRO SIMULATOR — Visual Inventory Map</title>
+<!-- ============================================================
+     THE GAME'S OWN STYLESHEETS — loaded for real so components in
+     the CSS INVENTORY section render pixel-identical to in-game.
+     ============================================================ -->
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/minigames.css">
+<link rel="stylesheet" href="css/title.css">
+<link rel="stylesheet" href="css/tutorial.css">
+<link rel="stylesheet" href="css/stats.css">
+<link rel="stylesheet" href="css/teams.css">
+<link rel="stylesheet" href="css/phone.css">
+<style>
+  /* ============================================================
+     GALLERY CHROME ONLY — this dev tool is not bound by the game's
+     tokens-only rule (see brief). Literal colours below are fine.
+     Anything with class "game-*" or inside .game-sample uses the
+     REAL game classes/tokens above, untouched.
+     ============================================================ */
+  html, body { background: #15161c; color: #e8e8ef; font-family: -apple-system, Segoe UI, Arial, sans-serif; margin: 0; padding: 0; }
+  * { box-sizing: border-box; }
+  a { color: #7db4ff; }
+  #gallery-shell { display: flex; min-height: 100vh; }
+
+  /* --- sticky TOC ------------------------------------------------ */
+  #toc {
+    position: sticky; top: 0; align-self: flex-start; height: 100vh; overflow-y: auto;
+    width: 240px; flex: 0 0 240px; background: #1d1e26; border-right: 1px solid #33343f;
+    padding: 14px 12px; font-size: 12.5px; z-index: 50;
+  }
+  #toc h1 { font-size: 14px; margin: 0 0 4px; color: #fff; }
+  #toc .sub { color: #9498a8; font-size: 10.5px; margin-bottom: 14px; line-height: 1.4; }
+  #toc nav a { display: block; padding: 4px 6px; border-radius: 4px; color: #c8cbdb; text-decoration: none; margin-bottom: 1px; }
+  #toc nav a:hover { background: #2a2c38; color: #fff; }
+  #toc nav a.sub-link { padding-left: 16px; font-size: 11.5px; color: #8f93a8; }
+  #toc .toc-group-label { margin-top: 12px; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #6b6f82; padding: 0 6px; }
+  #daynight-toggle { margin-top: 16px; padding: 10px; background: #26283350; border: 1px solid #3a3c4a; border-radius: 6px; }
+  #daynight-toggle label { display: block; font-size: 10.5px; color: #9498a8; margin-bottom: 6px; }
+  #daynight-toggle input[type=range] { width: 100%; }
+  #daynight-toggle .val { font-size: 11px; color: #fff; font-weight: 600; }
+  #status-line { margin-top: 12px; font-size: 10.5px; color: #6b6f82; line-height: 1.5; }
+
+  /* --- main content ------------------------------------------------ */
+  #main { flex: 1 1 auto; padding: 24px 32px 120px; max-width: 1600px; }
+  section.gsec { margin-bottom: 56px; padding-top: 8px; }
+  section.gsec > h2 { font-size: 20px; margin: 0 0 4px; color: #fff; border-bottom: 2px solid #33343f; padding-bottom: 8px; }
+  section.gsec > p.desc { color: #9498a8; font-size: 12.5px; margin: 8px 0 18px; max-width: 900px; line-height: 1.5; }
+  h3.subhead { font-size: 14px; color: #cfd2e0; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: .4px; border-left: 3px solid #4a6cf7; padding-left: 8px; }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* --- generic labelled tile -------------------------------------- */
+  .tile { background: #1d1e26; border: 1px solid #33343f; border-radius: 6px; padding: 8px; width: 168px; }
+  .tile canvas { display: block; background: #808080; border-radius: 3px; image-rendering: pixelated; }
+  .tile .cap { font-size: 10px; color: #c8cbdb; margin-top: 6px; line-height: 1.35; word-break: break-word; }
+  .tile .cap b { color: #fff; }
+  .tile .cap .dim { color: #6b6f82; }
+  .tile.wide { width: 260px; }
+  .tile.wider { width: 340px; }
+  .tile.fail { border-color: #7a3030; background: #2a1c1c; }
+  .tile.fail .cap { color: #ff9a9a; }
+
+  .swatch { width: 168px; background: #1d1e26; border: 1px solid #33343f; border-radius: 6px; overflow: hidden; }
+  .swatch .chip { height: 54px; }
+  .swatch .cap { padding: 6px 8px; font-size: 10.5px; }
+  .swatch .cap .name { color: #fff; font-family: monospace; display: block; }
+  .swatch .cap .val { color: #9498a8; font-family: monospace; font-size: 9.5px; }
+
+  .game-sample { background: #070a16; border: 1px solid #33343f; border-radius: 6px; padding: 16px; display: inline-block; vertical-align: top; }
+  .sample-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+  .sample-label { font-size: 10px; color: #6b6f82; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
+
+  code.inline { background: #26283350; padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+  #top-link { position: fixed; bottom: 18px; right: 18px; background: #4a6cf7; color: #fff; border: none; border-radius: 50%; width: 42px; height: 42px; cursor: pointer; font-size: 16px; z-index: 60; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+</style>
+</head>
+<body>
+
+<div id="gallery-shell">
+  <aside id="toc">
+    <h1>Visual Inventory Map</h1>
+    <div class="sub">Every procedural asset js/iso.js can draw, and a sample of every game CSS component — rendered live via the real modules. Built for the art-style redesign pass.</div>
+
+    <div id="daynight-toggle">
+      <label for="dn-slider">Day / Night (dayNightT) <span class="val" id="dn-val">0.00 (day)</span></label>
+      <input type="range" id="dn-slider" min="0" max="1" step="0.01" value="0">
+    </div>
+
+    <nav id="toc-nav">
+      <div class="toc-group-label">Sections</div>
+      <a href="#sec-tokens">Token palette</a>
+      <a href="#sec-props">Prop families &times; tiers</a>
+      <a href="#sec-rotations">Prop rotations</a>
+      <a href="#sec-rooms">Backdrops / rooms / day-night</a>
+      <a href="#sec-misc">Misc renderers</a>
+      <a href="#sec-css">CSS component inventory</a>
+    </nav>
+
+    <div id="status-line">Booting game modules&hellip;</div>
+  </aside>
+
+  <main id="main">
+
+    <section class="gsec" id="sec-tokens">
+      <h2>1. Token palette — css/tokens.css</h2>
+      <p class="desc">Every custom property declared on <code class="inline">:root</code>, resolved to its actual computed value in this page.</p>
+      <div class="grid" id="tokens-grid"></div>
+    </section>
+
+    <section class="gsec" id="sec-props">
+      <h2>2. Prop families &times; tiers</h2>
+      <p class="desc">Iterates <code class="inline">Iso.propMap</code> (item id &rarr; family/tier) and draws each with <code class="inline">Iso.drawFamily()</code> at rotation 0, against a neutral checkerboard so silhouettes read clearly. Labelled with item id, family, tier, and the shop name from <code class="inline">Data.shopItems</code>.</p>
+      <div class="grid" id="props-grid"></div>
+    </section>
+
+    <section class="gsec" id="sec-rotations">
+      <h2>3. Prop rotations (rot 0&ndash;3)</h2>
+      <p class="desc">One row per family (highest tier shown), all four rotations, so it's obvious which families' art actually changes when rotated in the editor.</p>
+      <div id="rotations-body"></div>
+    </section>
+
+    <section class="gsec" id="sec-rooms">
+      <h2>4. Backdrops, rooms &amp; day/night</h2>
+      <p class="desc">The 6 locations from <code class="inline">Data.locations</code>, each rendered as a full room via <code class="inline">Iso.renderRoom()</code> (drawBackdrop/floor/walls aren't individually exported) at three points across the day-night cycle: day (0), sunset (0.5), night (1). Also shown: the travel transition (van + road) and a packed moving-box.</p>
+      <div id="rooms-body"></div>
+    </section>
+
+    <section class="gsec" id="sec-misc">
+      <h2>5. Misc Iso renderers</h2>
+      <p class="desc">Anything else <code class="inline">window.Game.Iso</code> exports that draws pixels: shop icon renderer, packed box, travel transition.</p>
+      <div class="grid" id="misc-grid"></div>
+    </section>
+
+    <section class="gsec" id="sec-css">
+      <h2>6. CSS component inventory</h2>
+      <p class="desc">Live examples using the real game stylesheets and classes, grouped by source file. This is a representative sample of every component family named in the brief (buttons, panels, meters, badges, cards, phone tiles, toasts, screen headers, nav buttons, banners) &mdash; not literally every one of the ~600 selectors across 8 stylesheets.</p>
+      <div id="css-body"></div>
+    </section>
+
+  </main>
+</div>
+
+<button id="top-link" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&uarr;</button>
+
+<!-- ============================================================
+     REAL GAME MODULES — plain scripts, no bundler, must run from
+     file://. Only data.js + iso.js per the brief; State is stubbed
+     below (renderRoom/getRoomVisual only need State.findShopItem
+     and, optionally, State.currentGrid).
+     ============================================================ -->
+<script src="js/data.js"></script>
+<script src="js/iso.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var statusEl = document.getElementById('status-line');
+  function status(msg) { statusEl.textContent = msg; }
+
+  // ---- minimal State stub -------------------------------------------------
+  // renderRoom() calls window.Game.State.findShopItem(id) directly (iso.js
+  // line ~1772); getRoomVisual() optionally reads State.currentGrid() but
+  // tolerates its absence. We don't load the real js/state.js (it pulls in
+  // localStorage/save-slot machinery this static gallery has no business
+  // touching) — a tiny stub covering just what iso.js reads is honest and
+  // sufficient.
+  window.Game = window.Game || {};
+  window.Game.State = {
+    findShopItem: function (id) {
+      var items = (window.Game.Data && window.Game.Data.shopItems) || [];
+      for (var i = 0; i < items.length; i++) if (items[i].id === id) return items[i];
+      return null;
+    }
+  };
+
+  window.__GALLERY_READY__ = false;
+  window.addEventListener('DOMContentLoaded', function () {
+    try {
+      if (!window.Game || !window.Game.Iso || !window.Game.Data) {
+        status('FAILED to boot: window.Game.Iso or window.Game.Data missing.');
+        return;
+      }
+      status('Game modules loaded OK. Rendering…');
+      window.__GALLERY_READY__ = true;
+      if (window.__GALLERY_BUILD__) window.__GALLERY_BUILD__();
+    } catch (e) {
+      status('FAILED to boot: ' + e.message);
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

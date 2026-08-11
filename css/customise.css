@@ -1,0 +1,332 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/customise.css
+   The PAINT / LED COLOUR modal (SPEC-V21 §6). Owned by the modal package.
+
+   HARD RULE: zero raw hex in this file. Every colour comes from a
+   var(--token) declared in css/tokens.css. The swatch colours themselves are
+   the ONE exception in spirit but NOT in mechanism: they are item paint
+   values that live in js/data.js (Data.customisePalettes) and are applied as
+   inline styles by js/customise.js, so they never appear in this file at all.
+   The `rgba(255,255,255,.07)`-style values below are shading alphas, not
+   colours — the same idiom css/phone.css and css/style.css already use for
+   inner bevels, and they name no hue.
+
+   ---- THE ONE THING THIS FILE HAS TO GET RIGHT ---------------------------
+   A selection indicator that survives a palette running from pure white to
+   near-black slate. A coloured ring drawn ON the swatch is exactly what
+   disappears against the two near-white fabric entries and against the LED
+   yellow, so the indicator here is TWO independent things, neither of which
+   depends on the swatch's colour:
+
+     1. THE RING IS ON THE WELL, NOT ON THE CHIP. The well is the established
+        inventory-slot object (css/phone.css `.phone__slot`): --slot-fill
+        ground, 1px --slot-border, 1px --pixel-black outer ring, thick
+        --slot-sel ring when chosen. The chip sits 12px inside it, so the gold
+        ring is bounded by --slot-fill on the inside and --pixel-black on the
+        outside — two fixed dark values — and never touches the paint colour.
+        The 8px of dark ground between ring and chip is load-bearing: it is
+        what keeps the gold ring visible around the LED palette's own yellow,
+        which is within 1.1:1 of --slot-sel.
+     2. A TWO-TONE TICK ON THE CHIP. White core, heavy black halo, one path
+        drawn twice. For any background luminance the white and black
+        contrasts multiply to exactly 21, so the better of the two is never
+        below 4.58:1 — on every colour that can exist, not just these sixteen.
+
+   Reusing the inventory well rather than inventing a swatch anatomy is the
+   same call css/phone.css made in V18: a second grid anatomy for one concept
+   is what made the phone read as a separate product.
+   ========================================================================== */
+
+/* ---- the sheet ----------------------------------------------------------
+   Bottom-docked, because the point of the modal is judging a colour ON THE
+   PROP: a centred card would sit exactly where the room is. Measured at
+   420x860 the card's top edge lands at y=518, so 432px of the room canvas's
+   696px (62%) stays live and un-covered while the player taps. A prop sitting
+   in the bottom third of the room is still hidden — closing the sheet is the
+   only way to see it, because panning the camera would mean editing js/hub.js,
+   which this package does not own.
+
+   The veil is deliberately light (20% of --pixel-black, opacity on a token
+   fill so no new colour is named). Full strength would be the honest modal
+   convention but it recolours the thing being judged; at 20% every candidate
+   is dimmed identically, so the comparison the player is actually making is
+   unaffected, and the room still reads as inert. */
+.cust__backdrop {
+  background: none;
+  align-items: flex-end;
+  justify-content: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+.cust__backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--pixel-black);
+  opacity: .2;
+  pointer-events: none;
+}
+
+/* V18 §2.3 modal anatomy, identical to .reward-card: 2px --pixel-black outer
+   cut, a 1px --modal-inner highlight drawn as an inset ring just inside it,
+   3px stepped corner, hard unblurred drop. No overflow:hidden — the close
+   disc overlaps the outer border and clipping would eat it. */
+/* The 14px side margin is not a taste choice: js/ui.js hangs the close disc
+   at right:-13px of the card's padding box, so a card inset any less than
+   ~15px pushes the disc past the 420px frame, where #app's overflow:hidden
+   silently eats a slice of it. Measured: padding-box right 404 + 13 = 417,
+   3px clear. */
+.cust__card {
+  position: relative;
+  z-index: 1;
+  margin: 0 14px 10px;
+  padding: 0 11px 12px;
+  border: var(--modal-outer) solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  background: var(--modal-fill);
+  box-shadow:
+    inset 0 0 0 var(--modal-inner-w) var(--modal-inner),
+    var(--shadow-lg);
+  animation: cust-rise .22s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+/* One authored moment: the sheet rises. transform/opacity only — never a
+   layout property (SPEC-V18 §6). */
+@keyframes cust-rise {
+  from { transform: translateY(18px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+/* ---- the docked header tab (V18 §2.3 / §3) ------------------------------
+   Same treatment css/style.css gives .reward-card__title, declared here
+   because that rule is keyed to that class name. Full-bleeds to the card's
+   inner highlight: negative margins equal to the card padding MINUS
+   --modal-inner-w, so the bright ring still reads as a continuous line around
+   the tab. js/ui.js's UI.modalChrome() pads it clear of the close disc. */
+.cust__title {
+  align-self: stretch;
+  margin: 0 calc(var(--modal-inner-w) - 11px);
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--pixel-black);
+  border-radius: 1px 1px 0 0;
+  background: var(--panel-lo);
+  box-shadow:
+    inset 0 var(--btn-hi-h) 0 rgba(255, 255, 255, .22),
+    inset 0 calc(var(--btn-lo-h) * -1) 0 rgba(0, 0, 0, .3);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+
+.cust__hint {
+  margin: 9px 2px 11px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: .3px;
+  text-align: center;
+  color: var(--ink-dim);
+}
+
+.cust__group { display: block; }
+
+/* 4 x 84px + 3 x 9px = 363px inside the 366px the card's margins, borders and
+   padding leave at 420x860 — fixed track widths, like css/phone.css's
+   `repeat(3, 80px)`, so the well is the same object at the same size wherever
+   it appears and nothing can reflow it. */
+.cust__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 84px);
+  justify-content: center;
+  gap: 9px;
+}
+
+/* ---- the well ----------------------------------------------------------
+   css/phone.css `.phone__slot`, unchanged: --slot-fill ground, 1px
+   --slot-border, 1px --pixel-black outer ring as a box-shadow (so it costs no
+   layout), inner bevel pair. 86px square clears the 44px touch floor twice
+   over. */
+.cust__opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--slot-fill);
+  border: 1px solid var(--slot-border);
+  border-radius: var(--radius-pixel);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 2px 0 rgba(0, 0, 0, .55),
+    inset 0 -2px 0 rgba(255, 255, 255, .07);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform .04s linear;
+}
+.cust__opt--swatch { width: 84px; height: 84px; }
+
+/* Press: the same 1px drop + --slot-sel-alt inset ring the phone's slots use.
+   Drawn INSET so the well's footprint never changes — a border-width swap
+   would relayout the chip under the finger. The chosen well keeps its gold
+   ring while pressed rather than flashing green over it. */
+.cust__opt:active { transform: translateY(1px); }
+.cust__opt:not(.is-selected):active {
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 0 0 3px var(--slot-sel-alt);
+}
+
+/* INDICATOR 1 — a 5px gold ring (1px border + 4px inset) on the well's own
+   dark ground. See the header note: it never touches the paint colour. */
+.cust__opt.is-selected {
+  border-color: var(--slot-sel);
+  box-shadow:
+    0 0 0 1px var(--pixel-black),
+    inset 0 0 0 4px var(--slot-sel);
+}
+
+/* Keyboard focus is --slot-sel-alt so it is never confused with the gold
+   "this one is applied" ring, and it sits outside the well on --modal-fill. */
+.cust__opt:focus-visible {
+  outline: 2px solid var(--slot-sel-alt);
+  outline-offset: 3px;
+}
+
+/* ---- the chip ----------------------------------------------------------
+   The paint colour itself, set inline from Data.customisePalettes. The two
+   strips are the isometric ramp (ART-DIRECTION §2.2 — top x1.30, bottom
+   x0.70) derived from `background: inherit` + filter, the same way .btn::after
+   derives its bevel from the button's own colour: the swatch is shaded by the
+   exact rule the prop it paints is shaded by, and this file still names no
+   colour. The 1px black outline is an OUTER ring so the strips cannot cover
+   it (V18 §2.1). */
+.cust__chip {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px var(--pixel-black);
+}
+.cust__chip::before,
+.cust__chip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 7px;
+  background: inherit;
+}
+.cust__chip::before { top: 0; filter: brightness(1.30); }
+.cust__chip::after { bottom: 0; filter: brightness(0.70); }
+
+/* ---- FACTORY -----------------------------------------------------------
+   Its own full-width row rather than a ninth swatch: it is not a colour, it
+   is the undo, and the grid should not imply otherwise. Same well anatomy so
+   it is still the same object.
+
+   The chip holds the item's REAL untinted sprite, drawn by
+   Iso.renderPropIcon() — "factory finish" and "the original art" are the same
+   sentence, so the option shows it instead of describing it. The checkerboard
+   under it is V18 §2.4's ground motif doing its usual "nothing applied" job,
+   and is the fallback if the renderer is unavailable. */
+.cust__opt--factory {
+  width: 100%;
+  height: 62px;
+  margin: 9px auto 0;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.cust__chip--factory {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%)
+    0 0 / calc(var(--checker-size) / 2) calc(var(--checker-size) / 2);
+}
+.cust__chip--factory::before,
+.cust__chip--factory::after { display: none; }
+
+.cust__factory-sprite {
+  display: block;
+  width: 44px;
+  height: 44px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.cust__factory-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.cust__factory-name {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.cust__factory-sub {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* ---- INDICATOR 2 — the two-tone tick -----------------------------------
+   Authored SVG (24x24 viewBox, currentColor core), never a Unicode check.
+   Hidden until chosen; it appears with a short scale-in so the confirmation
+   is felt, not just seen. */
+.cust__mark {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(.6);
+  color: var(--ink-head);
+}
+.cust__opt--swatch .cust__mark { inset: 12px; }
+.cust__opt--factory .cust__mark { top: 8px; left: 12px; width: 46px; height: 46px; }
+
+/* Only the scale is transitioned. Opacity is binary on purpose: an indicator
+   whose VISIBILITY depends on an animation completing is an indicator that
+   can be caught half-there (measured for real — a stalled document timeline
+   left it at opacity 0). The tick is present or absent; the pop is decoration
+   on top of a state that is already correct. */
+.cust__opt.is-selected .cust__mark {
+  opacity: 1;
+  transform: scale(1);
+  transition: transform .18s cubic-bezier(.16, 1, .3, 1);
+}
+.cust__mark-svg { display: block; width: 30px; height: 30px; }
+/* The halo is painted first and 4.6 units wider than the core, i.e. ~2.9px of
+   --pixel-black around the tick at this size — heavy enough to be the whole
+   indicator on a white swatch, where the white core contributes nothing. */
+.cust__mark-halo { stroke: var(--pixel-black); stroke-width: 7.6; }
+.cust__mark-core { stroke: currentColor; stroke-width: 3; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cust__card { animation: none; }
+  .cust__opt { transition: none; }
+  .cust__mark { transform: none; }
+  .cust__opt.is-selected .cust__mark { transition: none; transform: none; }
+}
