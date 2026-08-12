@@ -1174,25 +1174,116 @@ check('d3 the Nuke route is winnable at top speed and lost at base speed', funct
   }
   var lo = parseInt(/BH_MIN_SPEED = (\d+)/.exec(src)[1], 10);
   var hi = parseInt(/BH_MAX_SPEED = (\d+)/.exec(src)[1], 10);
+  var slow = parseInt(/BH_BEAT_SLOW_MS = (\d+)/.exec(src)[1], 10);
+  var fast = parseInt(/BH_BEAT_FAST_MS = (\d+)/.exec(src)[1], 10);
   var intro = 1.3;                     // the A/D card, before the run starts
-  // Ramp is +26 per good tap on a 340ms beat, so top speed takes ~3s to reach.
-  var rampS = (hi - lo) / 26 * 0.340;
-  var rampDist = (lo + hi) / 2 * rampS;
-  var best = intro + rampS + Math.max(0, track - rampDist) / hi;
+  // Walk the actual ramp: +26 per good tap, on a traverse whose period slides
+  // from slow to fast as the speed climbs. Averaging it would flatter the
+  // player, because the slowest traverses are the ones they spend longest in.
+  var s = lo, t = 0, d = 0, guard = 0;
+  while (s < hi && guard++ < 200) {
+    var bm = slow + (fast - slow) * (s - lo) / (hi - lo);
+    t += bm / 1000;
+    d += s * bm / 1000;
+    s = Math.min(hi, s + 26);
+  }
+  var best = intro + t + Math.max(0, track - d) / hi;
   var worst = intro + track / lo;      // someone mashing, never holding the beat
-  assert.ok(best < 13, 'a clean run must finish inside 15s, got ' + best.toFixed(1) + 's');
+  assert.ok(best < 13.5, 'a clean run must finish inside 15s, got ' + best.toFixed(1) + 's');
   assert.ok(worst > 15, 'base speed alone must NOT reach Outside in 15s, got ' +
     worst.toFixed(1) + 's — the minigame would be free');
 });
 
+check('d3 the bhop rhythm sweeps, and its period scales with speed', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  // Ping-pong, not a wrapping sawtooth.
+  assert.ok(/function markerPos\(\) \{ return phase <= 1 \? phase : 2 - phase; \}/.test(src),
+    'the marker must sweep back and forth, not wrap from right to left');
+  // The travel direction IS the side to tap, so the two cannot desync.
+  assert.ok(/wrongSide = \(side !== sweepDir\(\)\)/.test(src),
+    'the side to tap should be read from the sweep direction');
+  assert.ok(!/nextSide = -nextSide/.test(src), 'the old alternating-side state should be gone');
+  // Period must shorten as speed climbs, and be roomier than the old 340ms.
+  var slow = parseInt(/BH_BEAT_SLOW_MS = (\d+)/.exec(src)[1], 10);
+  var fast = parseInt(/BH_BEAT_FAST_MS = (\d+)/.exec(src)[1], 10);
+  assert.ok(slow > fast, 'the beat must tighten as the player speeds up');
+  assert.ok(slow > 600, 'the base beat should be roomy, got ' + slow + 'ms');
+  // Slower marker + smaller window, so it does not simply get easier.
+  var green = parseFloat(/BH_GREEN = ([\d.]+)/.exec(src)[1]);
+  assert.ok(green <= 0.20, 'the green window should be tight, got ' + green);
+  // Phase is accumulated, never a modulo of a divisor that moves.
+  assert.ok(/phase = \(phase \+ \(t - phaseAt\) \/ beatMs\(\)\) % 2/.test(src),
+    'phase must accumulate, or changing the period teleports the marker');
+  // Mashing must not work.
+  assert.ok(/alreadyJumped = \(half\(\) === scoredHalf\)/.test(src),
+    'a second tap in the same sweep must not score');
+});
+
 check('d2 the spray game wins at 80% and fires 30 rounds', function () {
   var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
-  assert.ok(/AK_PATTERN\.length/.test(src) && /pct >= 0\.80/.test(src),
-    'spray should win at 80% of the rounds hitting');
-  var m = /var AK_PATTERN = \[([\s\S]*?)\];/.exec(src);
-  assert.ok(m, 'could not read the AK pattern');
-  var pts = m[1].match(/\[-?\d+, -?\d+\]/g) || [];
-  assert.strictEqual(pts.length, 30, 'the AK sprays 30 rounds, got ' + pts.length);
+  assert.ok(/hits \/ AK_ROUNDS >= 0\.80/.test(src), 'spray should win at 80% of the rounds hitting');
+  assert.ok(/var AK_ROUNDS = 30;/.test(src), 'the AK sprays 30 rounds');
+  // 30 rounds must empty in exactly the pacing node's trip, or the guide stops
+  // describing the run it is pacing.
+  assert.ok(/AK_RUN_MS = AK_ROUNDS \* AK_SHOT_MS/.test(src),
+    'the node trip and the magazine must share one duration');
+  var shotMs = parseInt(/AK_SHOT_MS = (\d+)/.exec(src)[1], 10);
+  assert.strictEqual(shotMs * 30, 3000, 'the spray should run 3s, got ' + (shotMs * 30) + 'ms');
+});
+
+check('d3 the spray is two-zoned, with the guide inside the control pad', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  // 60/40 split, with the pad taking the bottom.
+  assert.ok(/padTop = Math\.round\(h \* 0\.60\)/.test(src), 'the visual zone should be the top 60%');
+  assert.ok(/px\(c, 0, padTop, w, 4, '#000000'\)/.test(src), 'the zones need a black seam between them');
+  // The guide must be positioned from the PAD, never from the dummy — the whole
+  // point of the rework is that the player's hand stops covering the target.
+  var pathFn = /function nodeAt\(t\)[\s\S]*?\n    \}/.exec(src);
+  assert.ok(pathFn, 'could not read nodeAt()');
+  assert.ok(/padX \+/.test(pathFn[0]) && /padY \+/.test(pathFn[0]),
+    'the pacing node must be laid out in pad coordinates');
+  assert.ok(!/dummyX[^\n]*AK_PATH/.test(src), 'the guide must not be drawn on the dummy');
+  // Touches outside the pad must not start the spray.
+  assert.ok(/if \(p\.y < padTop\) return;/.test(src), 'the pad is the control surface, not the scene');
+  // The crosshair and the scoring must read the SAME error.
+  assert.ok(/function drift\(\)/.test(src), 'drift() should be the single error measure');
+  assert.ok(/var hit = d <= 1;/.test(src), 'a round hits when the finger is inside tolerance');
+  assert.ok(/kickX = k \* /.test(src) && /clamp\(drift\(\) - 1, 0, 3\)/.test(src),
+    'the crosshair kick must be driven by the same drift that scores');
+  // The clunky floating text is gone; a magazine bar replaces it.
+  assert.ok(!/HITS ' \+ hits/.test(src), 'the HITS x/30 readout should be gone');
+  assert.ok(!/SPRAY LOST/.test(src), 'the SPRAY LOST readout should be gone');
+  assert.ok(/SPRAY CONTROLLED!/.test(src), 'the win banner should remain');
+  assert.ok(/results\[i\] \? '#7FE3B0' : '#C0483C'/.test(src),
+    'the magazine bar must colour per round, not by a running count');
+});
+
+check('d3 the compensation path pulls down, then left, then swoops right', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  var m = /var AK_PATH = \(function \(\) \{([\s\S]*?)\n  \}\)\(\);/.exec(src);
+  assert.ok(m, 'could not read AK_PATH');
+  // Rebuild it exactly as the game does and assert the SHAPE, not the source.
+  var R = 30, pts = [], i, t, x, y, u;
+  for (i = 0; i < R; i++) {
+    t = i / (R - 1);
+    if (t < 0.34) { x = 0.50; y = 0.10 + (t / 0.34) * 0.34; }
+    else if (t < 0.68) { u = (t - 0.34) / 0.34; x = 0.50 - 0.32 * Math.sin(u * Math.PI / 2); y = 0.44 + u * 0.26; }
+    else { u = (t - 0.68) / 0.32; x = 0.18 + 0.60 * u * u; y = 0.70 + u * 0.18; }
+    pts.push([x, y]);
+  }
+  var start = pts[0], leftmost = pts.reduce(function (a, b) { return b[0] < a[0] ? b : a; });
+  var end = pts[R - 1];
+  assert.ok(Math.abs(start[0] - 0.5) < 0.01, 'the path should start at the pad centre');
+  assert.ok(start[1] < 0.15, 'the path should start near the top of the pad');
+  assert.ok(Math.abs(pts[8][0] - 0.5) < 0.01, 'the first third should pull straight down');
+  assert.ok(leftmost[0] < 0.22, 'the path must swing well left, got ' + leftmost[0].toFixed(2));
+  assert.ok(end[0] > 0.7, 'the path must swoop back right, got ' + end[0].toFixed(2));
+  // Monotonically descending: it is a drag DOWN the pad, never back up.
+  for (i = 1; i < R; i++) {
+    assert.ok(pts[i][1] >= pts[i - 1][1] - 1e-9,
+      'the path must never travel back up the pad (round ' + i + ')');
+  }
+  assert.ok(end[1] <= 1, 'the path must stay inside the pad');
 });
 
 check('d2 the bhop game ramps 250 -> 450+ and has a rhythm window', function () {

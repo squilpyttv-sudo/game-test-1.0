@@ -282,7 +282,7 @@ regression until proven otherwise):
 
 | suite | count |
 |---|---|
-| `test-v22-fixes.js` | 92 *(the owner's bug lists; add each batch here)* |
+| `test-v22-fixes.js` | 95 *(the owner's bug lists; add each batch here)* |
 | `test-v14-phone.js` | 20 *(was 19 — V22 added the SPONSORS gate test)* |
 | `test-v21-customise.js` | 18 |
 | `test-v20-customise.js` | 38 |

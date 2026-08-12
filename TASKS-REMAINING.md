@@ -148,6 +148,41 @@ CS-themed minigames, picked at random with no immediate repeat.
 | `spray` | one continuous **drag** | you land 80% of the AK's 30 rounds |
 | `bhop` | alternating rhythmic **taps** | you reach Outside on the Nuke route |
 
+### The spray is TWO ZONES, and the split is load-bearing
+
+Top 60% is the visual zone (brick range, wooden dummy, first-person AK,
+crosshair). Bottom 40% is the control pad, and the compensation line lives
+**entirely inside it**. The first version drew that line across the dummy, so
+the player's own hand covered the thing they were aiming at — if you ever find
+yourself moving the guide back up, that is the bug you are reintroducing.
+
+- `AK_PATH` is authored in **pad fractions**, and one array feeds the dotted
+  guide, the pacing node and the scoring. A second copy is how a guide ends up
+  describing a different test from the one being run.
+- `drift()` is the single error measure: it decides whether a round hits AND how
+  far the crosshair is thrown. What the player sees is what they are graded on.
+- 30 rounds at `AK_SHOT_MS` 100 = exactly the 3s the pacing node takes.
+  `AK_RUN_MS` is derived from both so they cannot drift apart.
+- Lifting off does not end the run early — the magazine empties on its own
+  clock and a player who lets go just misses the rest.
+
+### The bhop rhythm SWEEPS
+
+The marker runs left, then back right, and each traverse is one strafe. There is
+no separate "which side is next" state: the direction of travel **is** the side
+to tap, so the two cannot desync.
+
+- The period scales with speed (`BH_BEAT_SLOW_MS` 760 → `BH_BEAT_FAST_MS` 430),
+  so going faster is something you earn rather than just a bigger number.
+- `phase` is **accumulated**, never `now() % period` — the period moves, and a
+  modulo of a moving divisor teleports the marker every time speed changes.
+- `advance()` is idempotent and is called from the pointer handler and the probe
+  as well as `update()`. A tap judged against a phase one throttled frame stale
+  is judged against a marker the player is not looking at.
+- `BH_COAST_DROP` (18) is deliberately **smaller** than the +26 a good jump
+  gains. At 40 the penalty outweighed the reward and anything under ~61%
+  accuracy could never climb at all.
+
 Win → the bar snaps to 100%, holds 1.5s, then the ELO card. Fail → TRY AGAIN
 (only while >900ms remains) / QUIT. Timer hits zero → force-close, ELO card
 anyway.

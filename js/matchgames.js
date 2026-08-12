@@ -425,132 +425,304 @@
 
   /* ======================================================================
      MINIGAME 2 — AK-47 SPRAY CONTROL
-     Hold to fire 30 rounds; drag along the dotted guide to cancel the recoil.
-     A shot counts as a hit when the player's drag is close to the INVERSE of
-     the recoil at that round — i.e. they are pulling against it. 80% hits
-     wins, per the owner spec.
+
+     TWO ZONES, and the split is the whole point. The top 60% is the VISUAL
+     zone: the range, the dummy, the rifle, the crosshair — everything you need
+     to watch. The bottom 40% is the CONTROL PAD, and the compensation line
+     lives entirely inside it. The earlier version drew that line across the
+     dummy, so the player's own hand covered the thing they were aiming at.
+
+     The player holds and drags to keep up with a pacing node that runs the
+     line over three seconds. Their finger's error against that node is the
+     only input: on the node, the crosshair sits on the dummy's head and rounds
+     land in a tight cluster; off it, the crosshair kicks and rounds go into the
+     wall. 80% on the head wins, per the owner spec.
      ====================================================================== */
-  // The classic AK-47 pattern, normalised: up hard, then right, then a left
-  // sweep. Stored as the muzzle's climb so the guide and the scoring share
-  // one source — a second copy is how a guide ends up lying about the test.
-  var AK_PATTERN = [
-    [0, 0], [0, -22], [0, -44], [1, -66], [3, -86], [6, -104], [10, -119], [14, -131],
-    [18, -140], [22, -147], [24, -152], [20, -156], [12, -159], [2, -161], [-9, -163],
-    [-20, -164], [-30, -165], [-38, -166], [-42, -167], [-40, -168], [-33, -169],
-    [-23, -170], [-11, -171], [1, -172], [13, -173], [24, -174], [32, -175],
-    [37, -176], [39, -177], [38, -178]
-  ];
-  var AK_ROUNDS = AK_PATTERN.length;      // 30
-  var AK_SHOT_MS = 95;                    // ~630 rpm
+  var AK_ROUNDS = 30;
+  var AK_SHOT_MS = 100;                   // 600 rpm — 30 rounds in exactly 3s
+  var AK_RUN_MS = AK_ROUNDS * AK_SHOT_MS; // ...which is the pacing node's trip
+  var AK_TOL = 46;                        // px of slack before rounds start missing
+
+  /* The compensation path, in CONTROL-PAD fractions (0..1 across, 0..1 down).
+     Pull straight down, curve left, then swoop back right — the inverse of the
+     AK's climb, which is what your hand actually does. One array feeds the
+     dotted guide, the pacing node AND the scoring, so the guide can never
+     describe a different test from the one being run. */
+  var AK_PATH = (function () {
+    var pts = [], i, t, x, y, u;
+    for (i = 0; i < AK_ROUNDS; i++) {
+      t = i / (AK_ROUNDS - 1);
+      if (t < 0.34) {                       // straight down
+        x = 0.50;
+        y = 0.10 + (t / 0.34) * 0.34;
+      } else if (t < 0.68) {                // then out to the left
+        u = (t - 0.34) / 0.34;
+        x = 0.50 - 0.32 * Math.sin(u * Math.PI / 2);
+        y = 0.44 + u * 0.26;
+      } else {                              // and swooping back right
+        u = (t - 0.68) / 0.32;
+        x = 0.18 + 0.60 * u * u;
+        y = 0.70 + u * 0.18;
+      }
+      pts.push([x, y]);
+    }
+    return pts;
+  })();
 
   function makeSpray() {
     var firing = false, done = false;
     var shot = 0, hits = 0, fireStartedAt = 0;
-    var originX = 0, originY = 0;         // where the finger went down
-    var curX = 0, curY = 0;               // where it is now
-    var marks = [];                        // {x,y,hit} bullet holes on the dummy
-    var scale = 1;
+    var curX = 0, curY = 0;               // the finger, in canvas px
+    var holes = [];                        // {x, y, head} decals
+    var results = [];                      // per-round hit/miss, for the mag bar
+    var flashUntil = 0, redUntil = 0;
+    var kickX = 0, kickY = 0;              // live crosshair displacement
+    var padTop = 0, padX = 0, padY = 0, padW = 0, padH = 0;
+    var headX = 0, headY = 0;
+
+    /* Zone geometry. Called at construction as well as from draw(), because
+       update() and the pointer handlers read it — leaving it to the first
+       draw would let a touch land while the pad's bounds were still zero. */
+    function layout(w, h) {
+      padTop = Math.round(h * 0.60);
+      padX = 0; padY = padTop + 4; padW = w; padH = h - padY;
+      // Centre of the head block, which is what the crosshair locks to.
+      headX = w / 2; headY = padTop * 0.30 + 17;
+    }
+    layout(W || 420, H || 833);
+
+    function nodeAt(t) {                   // pacing node, in canvas px
+      var i = clamp(t, 0, 1) * (AK_ROUNDS - 1);
+      var a = AK_PATH[Math.floor(i)], b = AK_PATH[Math.min(AK_ROUNDS - 1, Math.ceil(i))];
+      var f = i - Math.floor(i);
+      return {
+        x: padX + (a[0] + (b[0] - a[0]) * f) * padW,
+        y: padY + (a[1] + (b[1] - a[1]) * f) * padH
+      };
+    }
+    function progress() {
+      if (!firing) return 0;
+      return clamp((now() - fireStartedAt) / AK_RUN_MS, 0, 1);
+    }
+    // 0 = dead on the node, 1 = hopelessly off. Drives BOTH the scoring and
+    // how far the crosshair is thrown, so what you see is what you are graded on.
+    function drift() {
+      var n = nodeAt(progress());
+      var dx = curX - n.x, dy = curY - n.y;
+      return Math.sqrt(dx * dx + dy * dy) / AK_TOL;
+    }
 
     function endSpray() {
       if (done) return;
       done = true;
       firing = false;
-      var pct = hits / AK_ROUNDS;
-      if (pct >= 0.80) {
+      if (hits / AK_ROUNDS >= 0.80) {
         setBanner('SPRAY CONTROLLED!', 'good');
         beep('cash');
-        setTimeout(win, 500);
+        win();                             // win() itself holds 1.5s
       } else {
-        setBanner('SPRAY LOST — ' + Math.round(pct * 100) + '%', 'bad');
-        beep('dink');
+        redUntil = now() + 380;
+        beep('miss');
         setTimeout(fail, 520);
       }
     }
 
     return {
       id: 'spray',
-      probe: function () { return { firing: firing, shot: shot, hits: hits, done: done, rounds: AK_ROUNDS }; },
+      probe: function () {
+        return { firing: firing, shot: shot, hits: hits, done: done,
+                 rounds: AK_ROUNDS, drift: firing ? +drift().toFixed(2) : -1 };
+      },
       down: function (p) {
         if (done || firing) return;
+        if (p.y < padTop) return;          // the pad is the control, not the scene
         firing = true;
-        originX = p.x; originY = p.y;
         curX = p.x; curY = p.y;
         fireStartedAt = now();
       },
       move: function (p) { if (firing) { curX = p.x; curY = p.y; } },
-      up: function () { if (firing && !done) endSpray(); },
+      // Lifting off does NOT end the run early: the magazine empties on its own
+      // clock, and a player who lets go simply misses the rest.
+      up: function () { },
       update: function () {
         if (!firing || done) return;
         /* Rounds are due on the WALL CLOCK, not on accumulated frame deltas.
            A dt-accumulator with a per-frame cap time-dilates the moment the
            frame rate drops — a backgrounded tab or a slow phone would stretch
-           a 2.8s spray into something much longer, and the guide would drift
-           out of step with the rounds it is supposed to describe. */
+           a 3s spray into something much longer, and the pacing node would
+           drift out of step with the rounds it is supposed to pace. */
         var due = Math.floor((now() - fireStartedAt) / AK_SHOT_MS) + 1;
         while (shot < due && shot < AK_ROUNDS && !done) {
-          var recoil = AK_PATTERN[shot];
-          // Ideal compensation is the inverse of the muzzle climb.
-          var wantX = -recoil[0] * scale, wantY = -recoil[1] * scale;
-          var gotX = curX - originX, gotY = curY - originY;
-          var dist = Math.sqrt((gotX - wantX) * (gotX - wantX) + (gotY - wantY) * (gotY - wantY));
-          // Tolerance grows a little as the pattern gets wilder, so the last
-          // rounds are not effectively impossible on a small screen.
-          var tol = 26 + shot * 0.9;
-          var hit = dist <= tol * scale;
+          var d = drift();
+          var hit = d <= 1;
           if (hit) hits++;
-          marks.push({ x: (dist <= tol * scale ? 0 : (gotX - wantX) * 0.25), y: shot, hit: hit });
-          beep(hit ? 'bhop' : 'miss');
+          results.push(hit);
+          // On target: a tight cluster on the head. Off it: into the wall,
+          // thrown in the direction the crosshair was kicked.
+          if (hit) {
+            holes.push({ x: headX + (Math.random() - 0.5) * 15,
+                         y: headY + (Math.random() - 0.5) * 15, head: true });
+          } else {
+            holes.push({ x: headX + kickX + (Math.random() - 0.5) * 60,
+                         y: headY + kickY + (Math.random() - 0.5) * 60, head: false });
+          }
+          if (holes.length > AK_ROUNDS) holes.shift();
+          flashUntil = now() + 55;
+          beep('ak');
           shot++;
           if (shot >= AK_ROUNDS) endSpray();
         }
+        // The kick follows the drift, with a little noise so a bad hold reads
+        // as the rifle fighting you rather than as a smooth offset.
+        var k = clamp(drift() - 1, 0, 3);
+        kickX = k * 34 * Math.cos(now() / 40) + (curX - nodeAt(progress()).x) * 0.55;
+        kickY = k * 26 * Math.sin(now() / 33) + (curY - nodeAt(progress()).y) * 0.35;
       },
       draw: function (c, w, h) {
-        scale = Math.min(1, w / 380);
-        px(c, 0, 0, w, h, '#2A3038');                       // range wall
-        px(c, 0, h * 0.72, w, h * 0.28, '#3A4250');         // floor
-        px(c, 0, h * 0.72, w, 4, '#1E242C');
+        var i, hx;
+        layout(w, h);
+        var dummyX = w / 2, dummyTop = padTop * 0.30;
 
-        // ---- target dummy ----
-        var dx = w / 2, dy = h * 0.34;
-        px(c, dx - 34, dy - 10, 68, 96, '#8A6A45');          // torso
-        px(c, dx - 16, dy - 52, 32, 42, '#8A6A45');          // head
-        px(c, dx - 34, dy + 86, 20, 60, '#6E5436');          // legs
-        px(c, dx + 14, dy + 86, 20, 60, '#6E5436');
-        // scoring rings
-        c.strokeStyle = '#C64B4B'; c.lineWidth = 2;
-        c.beginPath(); c.arc(dx, dy + 34, 30, 0, Math.PI * 2); c.stroke();
-        c.beginPath(); c.arc(dx, dy + 34, 16, 0, Math.PI * 2); c.stroke();
+        /* ---------- VISUAL ZONE: the range ---------- */
+        px(c, 0, 0, w, padTop, '#6A5B4E');                 // brick mortar bed
+        for (var by = 0; by < padTop; by += 22) {          // 16-bit brick courses
+          var stagger = ((by / 22) | 0) % 2 ? 34 : 0;
+          for (var bx = -68; bx < w; bx += 68) {
+            px(c, bx + stagger + 2, by + 2, 64, 18, '#8A6A55');
+            px(c, bx + stagger + 2, by + 2, 64, 4, '#9C7A62');   // lit top edge
+            px(c, bx + stagger + 2, by + 16, 64, 4, '#6E5443');  // shadowed base
+          }
+        }
+        px(c, 0, padTop * 0.80, w, 5, '#4E4237');          // range floor line
+        px(c, 0, padTop * 0.80, w, padTop * 0.20, '#5A4C40');
 
-        // ---- the recoil guide: glowing dotted line ----
+        /* ---- wooden target dummy ----
+           The head is its OWN block above the shoulders, not a plate painted on
+           the chest: the crosshair locks to it and rounds cluster on it, so it
+           has to be unmistakable which part of the target that is. */
+        var tw = 76, tTop = dummyTop + 44;
+        px(c, dummyX - 24, dummyTop - 3, 48, 40, '#3A2C20');                   // head outline
+        px(c, dummyX - 21, dummyTop, 42, 34, '#C49A60');                       // head
+        px(c, dummyX - 21, dummyTop, 42, 5, '#DDB176');                        // lit top
+        px(c, dummyX - 21, dummyTop + 29, 42, 5, '#A57F4A');                   // shadow
+        px(c, dummyX - 8, dummyTop + 34, 16, 12, '#8A6A3E');                   // neck
+        px(c, dummyX - tw / 2 - 3, tTop - 3, tw + 6, 82, '#3A2C20');           // torso outline
+        px(c, dummyX - tw / 2, tTop, tw, 76, '#B08A55');                       // torso
+        for (i = 0; i < 5; i++)                                                 // plank grain
+          px(c, dummyX - tw / 2 + 5 + i * 14, tTop + 4, 3, 68, '#9A7645');
+        px(c, dummyX - tw / 2 - 17, tTop + 8, 17, 48, '#9A7645');              // arms
+        px(c, dummyX + tw / 2, tTop + 8, 17, 48, '#9A7645');
+        px(c, dummyX - 8, tTop + 76, 16, 30, '#6E5436');                       // post
+        px(c, dummyX - 32, tTop + 106, 64, 9, '#5A4530');                      // base
+
+        // ---- bullet holes ----
+        for (i = 0; i < holes.length; i++) {
+          var H = holes[i];
+          px(c, H.x - 3, H.y - 3, 6, 6, '#1A1410');
+          px(c, H.x - 4, H.y - 4, 3, 3, H.head ? '#6A5030' : '#4E4034');
+        }
+
+        /* ---- first-person AK-47, held at the bottom-right of the visual zone.
+           Built as a real profile — stock, receiver, curved magazine, wooden
+           handguard, gas tube, barrel, front sight — and canted so the muzzle
+           rides up toward the target. The cant costs a little edge crispness
+           and buys the only thing that makes it read as a rifle rather than a
+           pile of boxes. */
         c.save();
-        c.shadowColor = '#34D3FF'; c.shadowBlur = 8;
-        for (var i = 0; i < AK_ROUNDS; i++) {
-          var r = AK_PATTERN[i];
-          // The guide shows where the player must DRAG (down/opposite), which
-          // is the inverse of the climb — the same value scoring uses.
-          var gx2 = dx - r[0] * scale * 0.9;
-          var gy2 = h * 0.60 - r[1] * scale * 0.9 * -1;
-          px(c, gx2 - 2, gy2 - 2, 4, 4, i <= shot ? '#7FE3B0' : '#34D3FF');
+        // POSITIVE rotation: the barrel runs toward -x, and rotate(-t) would
+        // swing that end downward, burying the muzzle in the control pad.
+        c.translate(w - 10, padTop - 14);
+        c.rotate(0.30);
+        // Held small and cornered. At full size the receiver ran clean across
+        // the dummy, hiding the one thing the player is meant to be watching.
+        c.scale(0.60, 0.60);
+        px(c, 4, -24, 62, 26, '#4A3728');                    // stock
+        px(c, 8, -20, 52, 6, '#5E4732');                     // stock highlight
+        px(c, -62, -28, 70, 28, '#33261B');                  // receiver
+        px(c, -60, -26, 64, 6, '#4A3728');                   // dust cover
+        px(c, -8, 0, 22, 32, '#3E2E20');                     // pistol grip
+        px(c, -42, 0, 28, 17, '#2E2419');                    // magazine, curving
+        px(c, -47, 15, 28, 17, '#2E2419');                   // forward and down
+        px(c, -54, 29, 26, 15, '#2E2419');
+        px(c, -128, -25, 68, 22, '#7A5836');                 // wooden handguard
+        px(c, -128, -25, 68, 5, '#8E6A44');
+        px(c, -126, -32, 60, 8, '#4E4238');                  // gas tube
+        px(c, -180, -23, 54, 11, '#8E9296');                 // barrel
+        px(c, -188, -34, 12, 16, '#6E7276');                 // front sight block
+        px(c, -196, -26, 16, 17, '#6E7276');                 // muzzle brake
+        if (now() < flashUntil) {                             // muzzle flash
+          px(c, -232, -30, 36, 26, '#FFE9A0');
+          px(c, -250, -25, 20, 16, '#FFB03A');
+          px(c, -224, -48, 13, 46, '#FFD060');
+          px(c, -214, -20, 46, 12, '#FFF3C8');
         }
         c.restore();
 
-        // ---- the player's live drag ----
+        // ---- the crosshair: classic green, tied to the finger ----
+        var cxh = headX + (firing ? kickX : 0), cyh = headY + (firing ? kickY : 0);
+        var gap = 5, len = 11;
+        c.save();
+        c.shadowColor = '#00FF66'; c.shadowBlur = 4;
+        px(c, cxh - gap - len, cyh - 1, len, 3, '#3CFF8A');
+        px(c, cxh + gap, cyh - 1, len, 3, '#3CFF8A');
+        px(c, cxh - 1, cyh - gap - len, 3, len, '#3CFF8A');
+        px(c, cxh - 1, cyh + gap, 3, len, '#3CFF8A');
+        c.restore();
+
+        /* ---------- the 2px black seam between the zones ---------- */
+        px(c, 0, padTop, w, 4, '#000000');
+
+        /* ---------- CONTROL PAD ---------- */
+        px(c, 0, padY, w, h - padY, '#232B33');            // dark slate
+        for (i = 0; i < w; i += 8) px(c, i, padY, 4, 1, '#2B343D');   // faint tooling
+        px(c, 0, h - 3, w, 3, '#161C22');
+
+        // ---- the compensation line, drawn ONLY in the pad ----
+        var pn = progress();
+        c.save();
+        c.shadowColor = '#34D3FF'; c.shadowBlur = 7;
+        for (i = 0; i < AK_ROUNDS; i++) {
+          var gp = nodeAt(i / (AK_ROUNDS - 1));
+          px(c, gp.x - 2, gp.y - 2, 5, 5, i < shot ? '#2F6E7E' : '#34D3FF');
+        }
+        c.restore();
+        px(c, nodeAt(0).x - 8, nodeAt(0).y - 8, 17, 17, '#0E3A44');   // start pad
+        px(c, nodeAt(0).x - 5, nodeAt(0).y - 5, 11, 11, '#34D3FF');
+
+        // ---- the pacing node, and the player's finger ----
         if (firing) {
-          var pxp = dx + (curX - originX), pyp = h * 0.60 + (curY - originY);
-          c.strokeStyle = '#FFD54A'; c.lineWidth = 2;
-          c.beginPath(); c.moveTo(dx, h * 0.60); c.lineTo(pxp, pyp); c.stroke();
-          px(c, pxp - 5, pyp - 1, 10, 2, '#FFFFFF');
-          px(c, pxp - 1, pyp - 5, 2, 10, '#FFFFFF');
+          var nd = nodeAt(pn), off = drift();
+          c.save();
+          c.shadowColor = off <= 1 ? '#7FE3B0' : '#FF6A5A';
+          c.shadowBlur = 12;
+          px(c, nd.x - 7, nd.y - 7, 15, 15, off <= 1 ? '#7FE3B0' : '#FF6A5A');
+          px(c, nd.x - 4, nd.y - 4, 9, 9, '#FFFFFF');
+          c.restore();
+          // a leash from the node to the finger, so the error is legible
+          c.strokeStyle = off <= 1 ? 'rgba(127,227,176,0.8)' : 'rgba(255,106,90,0.9)';
+          c.lineWidth = 2;
+          c.beginPath(); c.moveTo(nd.x, nd.y); c.lineTo(curX, curY); c.stroke();
+          px(c, curX - 9, curY - 2, 19, 4, '#FFD54A');
+          px(c, curX - 2, curY - 9, 4, 19, '#FFD54A');
         }
 
-        // ---- HUD ----
-        px(c, 10, 10, 120, 20, '#141820');
-        pixelText(c, 'HITS ' + hits + '/' + AK_ROUNDS, 18, 20, 11, hits >= AK_ROUNDS * 0.8 ? '#7FE3B0' : '#E8E8E8');
-        // ammo counter
-        pixelText(c, (AK_ROUNDS - shot) + ' / 30', w - 14, 20, 12, '#FFD54A', 'right');
-        if (!firing && !done) {
-          pixelText(c, 'HOLD AND DRAG DOWN THE LINE', w / 2, h - 26, 11, '#E8E2D0', 'center');
+        /* ---------- 16-bit magazine bar, top of screen ---------- */
+        var mw = w - 24, mx = 12, my = 8, mh = 14;
+        px(c, mx - 2, my - 2, mw + 4, mh + 4, '#000000');
+        px(c, mx, my, mw, mh, '#1A2028');
+        for (i = 0; i < AK_ROUNDS; i++) {
+          hx = mx + 2 + i * ((mw - 4) / AK_ROUNDS);
+          // Per-ROUND result, not a running count: colouring the first `hits`
+          // cells green would show a clean streak the player never shot.
+          px(c, hx, my + 2, (mw - 4) / AK_ROUNDS - 1.5, mh - 4,
+            i < shot ? (results[i] ? '#7FE3B0' : '#C0483C') : '#46525F');
         }
+
+        if (!firing && !done) {
+          pixelText(c, 'HOLD THE NODE AND FOLLOW THE LINE', w / 2, padY + padH - 14, 10,
+            '#E8E2D0', 'center');
+        }
+        if (now() < redUntil) px(c, 0, 0, w, h, 'rgba(255,60,60,0.40)');
       }
     };
   }
@@ -562,8 +734,22 @@
      Perfect rhythm reaches Outside in about five seconds.
      ====================================================================== */
   var BH_MIN_SPEED = 250, BH_MAX_SPEED = 470;
-  var BH_BEAT_MS = 340;       // one strafe per beat
-  var BH_GREEN = 0.30;        // half-width of the green zone, as beat fraction
+  /* The rhythm SWEEPS: the marker runs left, then back right, then left again,
+     and each traverse is one strafe. That is why there is no separate
+     "which side is next" state any more — the direction the marker is
+     travelling IS the side to tap, so the two can never disagree.
+     The period scales with speed: roomy while you are slow, tightening as you
+     actually get going, which is what makes going faster feel earned rather
+     than just a bigger number. */
+  var BH_BEAT_SLOW_MS = 760;  // one traverse at base speed
+  var BH_BEAT_FAST_MS = 430;  // ...and at top speed
+  var BH_GREEN = 0.16;        // half-width of the green zone, as traverse fraction
+  /* Speed lost per traverse you let pass without jumping. Deliberately SMALLER
+     than the +26 a good jump gains: at 40 the penalty outweighed the reward, so
+     anything under about 61% accuracy could never climb at all and the ramp was
+     unreachable for an ordinary player. At 18 a scrappy run still creeps
+     upward and a clean one is simply much faster. */
+  var BH_COAST_DROP = 18;
   var BH_SCALE = 0.55;        // map units -> screen px
 
   /* ---- NUKE, T SPAWN to OUTSIDE, in CS2 radar style -------------------
@@ -677,35 +863,52 @@
     var dist = 0, speed = BH_MIN_SPEED;
     var camX = BH_PATH[0][0]; // lags the player through the bend, so the turn
                               // sweeps instead of snapping
-    var beatStartedAt = 0;     // wall clock anchor for the beat
-    var nextSide = -1;         // -1 left, +1 right — must alternate
     var tilt = 0;
     var trail = [];
     var introUntil = now() + 1300;
     var done = false;
     var lastHitGood = false;
-    // 0..1 through the current beat, read from the clock so the stick on screen
-    // and the window the tap is judged against can never disagree.
-    function beatPhase() {
-      var e = (now() - beatStartedAt) % BH_BEAT_MS;
-      return e / BH_BEAT_MS;
+
+    /* phase runs 0..2: 0..1 is the marker travelling RIGHT, 1..2 travelling
+       back LEFT. It is accumulated from the wall clock rather than derived by
+       modulo, because the period changes with speed — a modulo of a moving
+       divisor makes the marker teleport every time the player gains a step. */
+    var phase = 0, phaseAt = 0;
+    var scoredHalf = -1;       // the half-sweep already credited, so mashing fails
+    var lastHalf = 0;
+
+    function beatMs() {
+      var t = clamp((speed - BH_MIN_SPEED) / (BH_MAX_SPEED - BH_MIN_SPEED), 0, 1);
+      return BH_BEAT_SLOW_MS + (BH_BEAT_FAST_MS - BH_BEAT_SLOW_MS) * t;
     }
+    // Idempotent, and called from the pointer handler as well as update(): a
+    // tap judged against a phase that is one throttled frame stale would be
+    // judged against a marker the player is not looking at.
+    function advance() {
+      var t = now();
+      if (!phaseAt) { phaseAt = t; return; }
+      phase = (phase + (t - phaseAt) / beatMs()) % 2;
+      phaseAt = t;
+    }
+    function markerPos() { return phase <= 1 ? phase : 2 - phase; }  // 0..1, ping-pong
+    function sweepDir() { return phase <= 1 ? 1 : -1; }              // +1 right, -1 left
+    function half() { return phase <= 1 ? 0 : 1; }
 
     function tap(side) {
       if (done) return;
       if (now() < introUntil) return;      // ignore taps during the intro card
-      // The stick sweeps 0..1; green is the middle band.
-      var beatT = beatPhase();
-      var offBeat = Math.abs(beatT - 0.5) > BH_GREEN;
-      var wrongSide = (side !== nextSide);
-      if (offBeat || wrongSide) {
+      advance();
+      var offBeat = Math.abs(markerPos() - 0.5) > BH_GREEN;
+      var wrongSide = (side !== sweepDir());
+      var alreadyJumped = (half() === scoredHalf);
+      if (offBeat || wrongSide || alreadyJumped) {
         speed = BH_MIN_SPEED;
         lastHitGood = false;
         beep('miss');
       } else {
         speed = Math.min(BH_MAX_SPEED, speed + 26);
         lastHitGood = true;
-        nextSide = -nextSide;
+        scoredHalf = half();
         tilt = side * 20;
         beep('bhop');
       }
@@ -713,11 +916,28 @@
 
     return {
       id: 'bhop',
-      probe: function () { return { dist: dist, speed: speed, beatT: beatPhase(), nextSide: nextSide, intro: now() < introUntil, track: BH_TRACK }; },
+      probe: function () {
+        // advance() first: the phase is only stepped by update(), so reading it
+        // raw would report wherever the last frame left it rather than where
+        // the marker actually is now.
+        if (now() >= introUntil) advance();
+        return { dist: dist, speed: speed, beatT: markerPos(), nextSide: sweepDir(),
+                 beatMs: Math.round(beatMs()), intro: now() < introUntil, track: BH_TRACK };
+      },
       down: function (p) { tap(p.x < W / 2 ? -1 : 1); },
       update: function (dt) {
         if (done) return;
-        if (now() < introUntil) { beatStartedAt = now(); return; }
+        if (now() < introUntil) { phaseAt = now(); return; }
+        advance();
+        // Let a whole traverse go by without jumping and you bleed speed, the
+        // way landing without hopping bleeds it in the real thing.
+        if (half() !== lastHalf) {
+          if (scoredHalf !== lastHalf) {
+            speed = Math.max(BH_MIN_SPEED, speed - BH_COAST_DROP);
+            lastHitGood = false;
+          }
+          lastHalf = half();
+        }
         dist += speed * dt;
         camX += (bhPathAt(dist).x - camX) * Math.min(1, dt * 3.2);
         tilt *= 0.88;
@@ -932,17 +1152,21 @@
         pixelText(c, Math.round(speed) + ' u/s', sx + sw / 2, 21, 14,
           fast ? '#7FE3B0' : (speed > 260 ? '#FFD54A' : '#E8E8E8'), 'center');
 
-        // ---- rhythm bar: green middle, sliding stick ----
-        var rbW = w * 0.76, rbX = (w - rbW) / 2, rbY = h - 54, rbH = 16;
+        // ---- rhythm bar: the marker sweeps across and back, never wraps ----
+        var rbW = w * 0.76, rbX = (w - rbW) / 2, rbY = h - 54, rbH = 18;
+        px(c, rbX - 2, rbY - 2, rbW + 4, rbH + 4, '#000000');
         px(c, rbX, rbY, rbW, rbH, '#141820');
-        px(c, rbX, rbY, rbW, 2, '#000000');
         var gW = rbW * BH_GREEN * 2;
         px(c, rbX + rbW / 2 - gW / 2, rbY, gW, rbH, '#2E6E4A');
         px(c, rbX + rbW / 2 - 1, rbY, 2, rbH, '#7FE3B0');
-        var stickX = rbX + beatPhase() * rbW;
-        px(c, stickX - 2, rbY - 4, 4, rbH + 8, lastHitGood ? '#FFFFFF' : '#FFD54A');
-        // which side is next
-        pixelText(c, nextSide < 0 ? 'TAP LEFT' : 'TAP RIGHT', w / 2, rbY - 16, 11, '#E8E2D0', 'center');
+        // travel arrows either side of the marker, so the direction of the
+        // sweep — which IS the side to tap — is readable at a glance
+        var mkX = rbX + markerPos() * rbW, dirR = sweepDir() > 0;
+        px(c, mkX - 3, rbY - 5, 6, rbH + 10, lastHitGood ? '#FFFFFF' : '#FFD54A');
+        var arrX = mkX + (dirR ? 10 : -16);
+        px(c, arrX, rbY + rbH / 2 - 2, 6, 4, '#FFD54A');
+        px(c, arrX + (dirR ? 5 : 1), rbY + rbH / 2 - 5, 3, 10, '#FFD54A');
+        pixelText(c, dirR ? 'TAP RIGHT' : 'TAP LEFT', w / 2, rbY - 18, 11, '#E8E2D0', 'center');
 
         // ---- intro: big translucent A / D ----
         if (now() < introUntil) {

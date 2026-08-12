@@ -141,10 +141,14 @@
        awp:  a low crack falling fast — the rifle report.
        dink: the high metallic ping of a helmet hit, deliberately the brightest
              sound in the game so a failed reaction is unmistakable.
-       bhop: a short tick for an on-beat strafe; quiet, because it fires often. */
+       bhop: a short tick for an on-beat strafe; quiet, because it fires often.
+       ak:   the rifle report. Deliberately the quietest preset here — the
+             spray empties 30 rounds in three seconds, so anything at the
+             volume of a single-shot sound would be punishing. */
     awp:   { freq: 300,  type: 'sawtooth', dur: 0.22, gain: 0.22, sweep: -260 },
     dink:  { freq: 1500, type: 'square',   dur: 0.12, gain: 0.18, sweep: -700 },
-    bhop:  { freq: 640,  type: 'square',   dur: 0.03, gain: 0.07 }
+    bhop:  { freq: 640,  type: 'square',   dur: 0.03, gain: 0.07 },
+    ak:    { freq: 210,  type: 'sawtooth', dur: 0.05, gain: 0.06, sweep: -120 }
   };
   UI.beep = function (kind) {
     var st = window.Game && window.Game.State && window.Game.State.data;
