@@ -91,6 +91,61 @@
     return musicVol / 100;
   }
 
+  /* ---- applying the volume -------------------------------------------------
+     iOS Safari makes HTMLMediaElement.volume READ-ONLY. Assigning it there is
+     a silent no-op, so `el.volume = 0` left the music playing at full blast
+     and the slider did nothing on a phone — every iOS browser is WebKit, so
+     this is not just Safari.
+
+     Two mechanisms, because neither alone is enough:
+       - `muted` IS honoured everywhere, including iOS, so it guarantees that
+         sliding to zero actually silences the music on every platform.
+       - a WebAudio GainNode gives real PROPORTIONAL control on iOS, where
+         `.volume` cannot. Desktop keeps working through `.volume` regardless,
+         so if the graph never builds nothing is lost.
+     -------------------------------------------------------------------------- */
+  var actx = null, gainNode = null, graphTried = false;
+
+  function ensureGraph() {
+    if (graphTried) return !!gainNode;
+    graphTried = true;                      // one attempt only, ever
+    if (!el) return false;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      actx = new Ctx();
+      var srcNode = actx.createMediaElementSource(el);
+      gainNode = actx.createGain();
+      gainNode.gain.value = musicGainValue();
+      srcNode.connect(gainNode);
+      gainNode.connect(actx.destination);
+      return true;
+    } catch (e) {
+      // file:// opaque origins and older WebKit can both refuse this. Falling
+      // back is safe: `.volume` still works wherever it is writable, and
+      // `muted` still covers zero everywhere.
+      actx = null; gainNode = null;
+      return false;
+    }
+  }
+
+  /* Routing the element through a graph means a SUSPENDED context is silence,
+     so resume on every gesture we get rather than only on the first. */
+  function resumeCtx() {
+    if (actx && actx.state === 'suspended') {
+      try { var r = actx.resume(); if (r && r.catch) r.catch(function () {}); } catch (e) { /* ignore */ }
+    }
+  }
+  document.addEventListener('pointerdown', resumeCtx, true);
+
+  function applyVolume() {
+    if (!el) return;
+    var g = musicGainValue();
+    el.muted = (g === 0);
+    try { el.volume = g; } catch (e) { /* read-only on iOS; muted/gain cover it */ }
+    if (gainNode) { try { gainNode.gain.value = g; } catch (e) { /* ignore */ } }
+  }
+
   /* reshuffle — Fisher-Yates, with one extra rule: the first track of a new
      cycle may not repeat the last track of the previous one. Without that,
      a 3-track shuffle plays the same song twice in a row about 1 time in 3,
@@ -115,7 +170,7 @@
     try { el = new window.Audio(); } catch (e) { el = null; return null; }
     el.preload = 'none';   // never pre-buffer tracks the player may not reach
     el.loop = false;        // the playlist advances; a single track never loops
-    el.volume = musicGainValue();
+    applyVolume();
     // Advance on natural end AND on error — a track that fails to decode must
     // not silently end the music for the rest of the session.
     el.addEventListener('ended', function () { advance(); });
@@ -145,6 +200,11 @@
   var Audio = {};
 
   Audio.start = function () {
+    // Called only from gesture handlers (js/title.js), which is exactly where
+    // an AudioContext is allowed to be created and resumed.
+    ensureEl();
+    ensureGraph();
+    resumeCtx();
     if (running) {
       // Already going — but a tab-switch or an iOS interruption can leave the
       // element paused. Nudge it rather than restarting the track.
@@ -164,7 +224,7 @@
   Audio.setMusicVolume = function (v) {
     musicVol = clamp01to100(v);
     persistPrefs();
-    if (el) el.volume = musicGainValue();
+    applyVolume();
   };
 
   // Exposed for verification: which track is playing and what the order is.
@@ -174,6 +234,9 @@
       order: order.slice(), pos: orderPos,
       current: order.length ? TRACKS[order[orderPos]] : null,
       volume: el ? el.volume : null,
+      muted: el ? el.muted : null,
+      gain: gainNode ? gainNode.gain.value : null,
+      ctxState: actx ? actx.state : null,
       paused: el ? el.paused : null,
       time: el ? el.currentTime : null,
       duration: el ? el.duration : null,

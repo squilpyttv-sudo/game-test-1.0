@@ -1528,10 +1528,45 @@ check('b6 the default music volume is modest and the slider still drives it', fu
   assert.ok(d, 'could not read DEFAULT_MUSIC');
   var vol = parseInt(d[1], 10);
   assert.ok(vol > 0 && vol <= 40, 'default music volume should be audible but modest, got ' + vol);
-  assert.ok(/Audio\.setMusicVolume = function/.test(src) && /el\.volume = musicGainValue\(\)/.test(src),
-    'the SETTINGS slider must move the element volume live');
+  assert.ok(/Audio\.setMusicVolume = function/.test(src) && /applyVolume\(\)/.test(src),
+    'the SETTINGS slider must move the volume live');
   var title = fs.readFileSync(path.join(ROOT, 'js/title.js'), 'utf8');
   assert.ok(/setMusicVolume/.test(title), 'the settings screen must still be wired to it');
+});
+
+check('e1 the music slider can silence the music on iOS, where .volume is read-only', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/audio.js'), 'utf8');
+  // `muted` is the ONLY volume control iOS WebKit honours. Without it, sliding
+  // to zero left the music playing at full blast on every iPhone.
+  assert.ok(/el\.muted = \(g === 0\)/.test(src),
+    'zero must set muted, because assigning .volume is a no-op on iOS');
+  // ...and a gain node for proportional control there.
+  assert.ok(/createMediaElementSource/.test(src), 'expected a WebAudio gain path for iOS');
+  assert.ok(/gainNode\.gain\.value = g/.test(src), 'the gain node must track the slider');
+  // Every volume write must go through the one helper, or a caller will set
+  // .volume directly and silently do nothing on a phone again. Count CODE
+  // only: the header comment quotes `el.volume = 0` while explaining the bug,
+  // and a test that cannot tell prose from an assignment is measuring nothing.
+  var code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  var directWrites = code.match(/el\.volume\s*=/g) || [];
+  assert.strictEqual(directWrites.length, 1,
+    'only applyVolume() may assign el.volume, found ' + directWrites.length + ' in code');
+  assert.ok(/try \{ el\.volume = g; \} catch/.test(src),
+    'the one .volume write must be guarded — it can throw on strict-mode read-only');
+  // Routing through a graph makes a suspended context total silence, so the
+  // context has to be resumed from gestures, not just created once.
+  assert.ok(/function resumeCtx\(\)/.test(src) && /addEventListener\('pointerdown', resumeCtx/.test(src),
+    'a suspended AudioContext would silence everything; resume it on gestures');
+  // The graph must be optional: file:// opaque origins refuse it. Read the
+  // function and inspect its catch, rather than budgeting characters between
+  // two tokens — a comment growing by a line should not fail this.
+  var graphFn = /function ensureGraph\(\)[\s\S]*?\n  \}/.exec(src);
+  assert.ok(graphFn, 'could not read ensureGraph()');
+  var rescue = /catch \(e\) \{([\s\S]*)\}/.exec(graphFn[0]);
+  assert.ok(rescue, 'ensureGraph() must catch — createMediaElementSource can throw');
+  assert.ok(/gainNode = null/.test(rescue[1]) && /return false/.test(rescue[1]),
+    'a failed graph must reset state and fall back rather than throw');
+  assert.ok(/graphTried = true;/.test(src), 'the graph should only be attempted once');
 });
 
 check('b7 the mobile install files exist and ask for fullscreen portrait', function () {

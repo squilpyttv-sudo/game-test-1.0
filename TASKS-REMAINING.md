@@ -121,6 +121,19 @@ a save whose tower was moved to its own tile is still legal and is left alone.
 
 ### Things that will bite you if you forget them
 
+- **`HTMLMediaElement.volume` is READ-ONLY on iOS.** Assigning it there is a
+  silent no-op, and every iOS browser is WebKit, so this is not just Safari.
+  The music slider therefore did nothing on a phone — including at zero. Volume
+  now goes through `applyVolume()`, which sets `muted` (honoured everywhere) for
+  the zero case and a WebAudio GainNode for proportional control. **Never assign
+  `el.volume` directly**; a test counts the assignments in `js/audio.js` code
+  and fails on a second one. Note this cannot be reproduced on desktop — the
+  fix was verified by making `.volume` read-only at runtime to imitate iOS.
+- Because the element is routed through a GainNode, **a suspended AudioContext
+  is total silence**. `resumeCtx()` runs on every `pointerdown` for that reason;
+  do not remove it. If the graph fails to build (file:// opaque origins), the
+  code falls back to `.volume` + `muted` and nothing is lost.
+
 - **`stream_minutes` counts SECONDS.** The id is a legacy save key. Same trick
   as `lucky_mousepad` and the `phone_unlock` tutorial id: an id written into a
   save is never renamed, only redocumented.
