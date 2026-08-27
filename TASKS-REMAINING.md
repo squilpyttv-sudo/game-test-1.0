@@ -270,6 +270,143 @@ starting them.
 
 ---
 
+## V23 — FIXING ACT ONE (owner-directed, 2026-08-27) — **SPECCED, NOT BUILT**
+
+> Full contract: **`SPEC-V23-QUESTS.md`** — ownership map, catalog, save schema,
+> the CLUTCH minigame and the test plan. What follows is the why.
+
+The owner's report: *"i dont like the progression rn, since you have to grind
+till 2.1k elo and it gets boring quick."*
+
+### The diagnosis, measured — not guessed
+
+Simulated through the real `State.playMatch()`, all energy on PLAY (the fastest
+possible climb, 5 matches/day at `energyCosts.play` 20):
+
+| Daily aim grade | Win rate | Days to 2,100 | Matches |
+|---|---|---|---|
+| never trains (form 0) | 36.7% | 331 | 1,655 |
+| C-grade (0.35) | 57.5% | 24 | 120 |
+| B-grade (0.60) | 81.8% | 11 | 55 |
+| perfect S (1.00) | 94.3% | 7 | 35 |
+
+**Length is not the problem — 55–120 matches is not a long grind.** Three real
+problems, all structural:
+
+1. **Nothing unlocks between 0 and 2,100.** There are exactly three ELO gates in
+   the entire codebase and all three are the contract requirements
+   (2100/2700/3500). Nine rank names change colour and that is the *whole*
+   reward structure of act one.
+2. **Act one pays nothing, in any currency.** Solo matches pay `$0` by design
+   (README §2), `Data.hype.matchWin` is `0`, and `applyReputationChange` only
+   fires when signed. A pre-2100 match win moves exactly **one** number. Teams,
+   tournaments, scrims, chemistry, prize money, salary, sponsors and the
+   100-team ladder are all behind the one wall — a free agent even gets an
+   empty tournament screen (`js/tournaments.js:360`).
+3. **A visible stall at 1,400**, where `earlyMult` decays to 1.0
+   (`js/state.js:3401`). Milestone spacing at form 0.60: 0→1,400 is 35 matches,
+   then 1,400→2,100 — *half the distance* — is another 43. The game gets
+   measurably stingier at the exact midpoint.
+
+Underneath all of it: **PLAY contains no decisions.** V22d's active match is
+deliberately theatre — it "decides how FAST a match resolves, never WHETHER it
+is won" — so mechanical skill has nowhere to actually pay out in act one.
+
+### Item 1 — QUESTS via an EMAIL app on the phone (owner's idea)
+
+Invitations arrive in a phone inbox: play a local LAN, win extra cash and ELO.
+Owner: *"there has to be a minigame for it or smth."*
+
+**The load-bearing insight:** `js/matchgames.js` may never decide a match
+outcome, by deliberate design, so that it cannot become a difficulty gate on
+core progression. A quest is **opt-in side content**, so its minigame *can*
+decide the outcome — and that is precisely why quests are the right home for
+one. This is the first place in the game where mechanical skill pays directly.
+
+**Money is the real reward, not the ELO.** An invite every ~4 days at ~+50 ELO
+is worth about two matches against 5/day — negligible as a progression lever.
+But act one currently has *no* income at all, so the purse is what actually
+lands. Do not oversell the ELO.
+
+### Item 2 — SURFACE THE PRO SCENE FROM DAY ONE (owner picked this)
+
+The 100-team ladder, the scouting model and `reputationAllowsTier()` all exist
+and are invisible until 2,100. Add a scout-interest readout that fills as the
+player climbs, with staged beats (teams start watching, a "we're tracking you"
+note, a trial invite, then the offer). Almost no new economy — it is a readout
+over data the game already computes.
+
+**These two converge, and that makes both cheaper:** the email app is the
+natural delivery surface for scout messages as well as LAN invites. One inbox,
+two senders. Spec them together.
+
+### Owner decisions made 2026-08-27 — do not re-ask
+
+- **A new bespoke minigame**, not a scored gauntlet of the existing three.
+  It is **THE CLUTCH** — a 1vX retake whose verb is a *positional, predictive*
+  tap, where the crosshair travels to your tap at a finite speed and fires on
+  arrival. That travel time is load-bearing: a tap that lands instantly makes
+  pre-aiming worthless and collapses the game into whack-a-mole. See
+  `SPEC-V23-QUESTS.md` §5.
+- **Quests cost no energy.** Difficulty and the ELO penalty on a loss carry the
+  stakes instead (§4.3).
+
+### Still open — owner's call before dispatch
+
+- The reward table (purse and ELO per invite tier). Proposed and anchored to
+  the real economy in `SPEC-V23-QUESTS.md` §4.1, but never ratified.
+- Best-of-3 rounds per LAN (~30s, an event) vs one longer round.
+- Whether the scout-stage-3 trial is a normal CLUTCH or a harder variant.
+
+### Traps this work will hit
+
+- Every new top-level save key (`emails`, invite bookkeeping, scout interest)
+  **must** be added to `defaultData()` or `normalizeSave()` drops it silently
+  (HANDOFF-V2 §5.1 — this has shipped broken five or more times).
+- A new phone app needs an entry in **all four** of `js/phone.js`'s maps —
+  `APP_ICON`, `APP_COLOR`, `APP_ORDER`, and `APP_ROUTE` if it routes to a real
+  screen. Same class of bug as the missing shop `CATEGORY_ORDER` tab (§5.3).
+- The envelope icon must be **authored SVG**, not `✉` — that exact glyph was
+  already removed from `career.js` once (ART-DIRECTION §2.5).
+
+## V22f — THE BHOP REMAKE — **DONE** (2026-08-27)
+
+Owner: the bhop character *"is a square with a pistol in the front of it, which
+just looks bad"*, and the game only ever ran Nuke.
+
+- **The player is now a 16x16 authored bitmap** (`BH_SPRITE`), not four nested
+  rects and a stick: barrel, front sight, both gloves on the handguard, wood
+  furniture, arms opening to the shoulders, a rounded head from directly above,
+  and a pack. It pivots on the TORSO (`BH_SPRITE_PIVOT_ROW` 11.5) so a strafe
+  swings the body rather than waving the muzzle.
+- **It carries a dilated cream halo under its dark outline.** A dark outline
+  alone vanishes on Nuke's near-black asphalt; a light one alone washes out on
+  Dust 2's pale stone. The halo is precomputed once, never dilated per frame.
+- **DUST 2 is the second map** — T SPAWN → OUTSIDE LONG → DOUBLE DOORS → LONG A
+  → A SITE, traced off the owner's radar shots. Authored **unrotated**, unlike
+  Nuke: Long already runs bottom-to-top on the real radar, so screen-up is
+  genuinely map-north and every callout sits where a player expects it.
+- Track lengths: Nuke **3491.5**, Dust 2 **3486.5** — 5 units apart, so ONE set
+  of speed/beat constants governs both. Clean run 10.2s, mashing 15.3s, on both.
+- Dust 2's palette is the hard case (real walls and floors are the same
+  sandstone). Structure is a darker, cooler ochre; measured separation from its
+  three walkable surfaces is 52.8 / 78.0 / 104.3 — well past the 24 required.
+- New props: `crate`, `barrel` (rust and blue), `car`, `pallet`, `rubble`; a
+  stone **well** as Dust 2's answer to the silo; the blue-and-gold **dome**
+  beyond A site as its answer to Cedar Creek.
+
+**A pre-existing bug this found:** Nuke's `cont@700,1300` sat flat ON the
+running lane — measured clearance **0.0**, i.e. the player ran straight through
+a steel shipping container on every single run. Moved; it clears by 41 now.
+
+**Tests: `test-v22-fixes.js` 96 → 99.** Two old checks were **REWRITTEN, not
+extended**: they regexed a single hard-coded route (`BH_PATH`, `BH_SILO`,
+`BH_PROPS`, `SURF`) out of the source, which can only ever describe one map.
+Five data-driven checks replace them, loading the module through a new
+`MatchGames.__maps()` seam and asserting the *relationship* for every map —
+so a third map is covered the day it lands. They also assert route-on-floor and
+solid-prop lane clearance, which is what caught the container above.
+
 ## 1. LATE-GAME CONTENT (owner asked, never built)
 
 The biggest genuine gap in the game. Raised in the V15 list ("late-game

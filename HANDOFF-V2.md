@@ -313,8 +313,10 @@ Note `serve` 301s `/index.html` → `/`, and takes ~20s to boot on first run.
 - `HANDOFF.md` — the original; pre-V20 history and full balance numbers.
 - `PROGRESS.md` — historical trail per version.
 - `ART-DIRECTION.md` — the art rules (shading, outlines, icon policy).
-- `SPEC-V*.md` — one per version; `SPEC-V20-CUSTOMISE.md` and
-  `SPEC-V21-CUSTOMISE-MODALS.md` are the current ones.
+- `SPEC-V*.md` — one per version. **`SPEC-V23-QUESTS.md` is the current one**
+  (the email app, LAN quests, THE CLUTCH minigame, and scout interest —
+  specced, not built); `SPEC-V20-CUSTOMISE.md` and
+  `SPEC-V21-CUSTOMISE-MODALS.md` are the most recent shipped ones.
 - `mockups/` — the **V1** gallery, three redesigns stale. Kept as history by the
   owner's decision, not as a target; it carries a banner saying so. Never treat
   it as the current visual reference — `ART-DIRECTION.md` plus whatever the root
