@@ -728,10 +728,15 @@
   }
 
   /* ======================================================================
-     MINIGAME 3 — TOP-DOWN NUKE BHOP RUN
+     MINIGAME 3 — TOP-DOWN BHOP RUN, ON NUKE OR DUST 2
      Alternate left/right taps in time with the rhythm stick. On-beat and
      alternating builds speed 250 -> 450+; anything else drops you to 250.
-     Perfect rhythm reaches Outside in about five seconds.
+     Perfect rhythm reaches the finish in about nine and a half seconds.
+
+     TWO MAPS, picked per run with no immediate repeat (see BH_MAPS). Both
+     routes are tuned to within 6 units of the same track length, so ONE set
+     of speed and beat constants governs both — reshape either route without
+     re-checking that and it silently becomes free or impossible.
      ====================================================================== */
   var BH_MIN_SPEED = 250, BH_MAX_SPEED = 470;
   /* The rhythm SWEEPS: the marker runs left, then back right, then left again,
@@ -752,86 +757,337 @@
   var BH_COAST_DROP = 18;
   var BH_SCALE = 0.55;        // map units -> screen px
 
-  /* ---- NUKE, T SPAWN to OUTSIDE, in CS2 radar style -------------------
-     Authored in a frame ROTATED 90 degrees from the real radar: the player
-     always runs toward -y (up the screen), which is the only layout that
-     works on a 420-wide portrait phone. Real map north therefore points
-     screen-LEFT, which is why MAIN sits left of the route and T RED right —
-     that is where they are relative to the run, not an invented layout.
-     Baking the rotation into the data (rather than rotating the camera each
-     frame) keeps every rect axis-aligned, so the art stays pixel-crisp and
-     the callout labels stay upright for free. */
-  /* Rects are [x, y, w, h, surface]:
-       0 asphalt yard (T Spawn's loading area — dark, painted, oil-stained)
-       1 outdoor concrete (the connector and Outside)
-       2 building interior (the neighbours you pass but never enter)
-     Anything NOT covered by a rect is plant structure: roof decks, vents and
-     the Cedar Creek buildings. Inverting it that way is what makes this read
-     as Nuke rather than as a radar — the negative space is architecture. */
-  var BH_ROOMS = [
-    // T SPAWN — a wide yard that necks down into the exit. The back wall sits
-    // well behind the spawn point (y 3596 vs a start of 3470) so the camera has
-    // something to show, rather than void, the moment the run begins.
-    [88, 2496, 544, 1100, 0], [192, 2240, 336, 256, 0], [240, 1960, 240, 280, 0],
-    // the connector: a staircase of rects carrying the route right and up
-    [240, 1760, 300, 240, 1], [240, 1600, 448, 160, 1],
-    [480, 1440, 352, 160, 1], [608, 1280, 288, 176, 1],
-    // OUTSIDE — the open concrete the run ends on
-    [528, 100, 472, 1360, 1],
-    // neighbours, so the plant feels like a place rather than a tube
-    [130, 260, 360, 640, 2],     // MAIN
-    [130, 940, 250, 200, 2],     // SQUEEKY
-    [1040, 1120, 160, 210, 2]    // T RED
-  ];
-  // Callouts are held off the running lane on purpose — a label centred on the
-  // route ends up permanently underneath the player sprite.
-  var BH_LABELS = [
-    ['T SPAWN', 185, 3150, 14], ['SILO', 585, 920, 11],   // sits ON the tank
-    ['OUTSIDE', 640, 300, 14], ['MINI', 900, 620, 11],
-    ['MAIN', 400, 620, 12], ['SQUEEKY', 250, 1040, 10], ['T RED', 1120, 1230, 10]
-  ];
-  var BH_SILO = [585, 920, 92];   // the tank, straddling the west wall as it does live
+  /* ==== THE MAPS ==========================================================
+     A run picks one map at random with no immediate repeat — the same rule
+     pickGame() needs, for the same reason: with two maps a naive coin flip
+     repeats half the time, which reads as "it only has one map".
 
-  /* Set dressing, all lifted from the two reference shots of the real Outside:
-     rust-orange shipping containers, the red delivery truck parked in T Spawn,
-     yellow hazard hatching and parking bays, and the big silver pipe runs.
-     Everything is placed clear of the running lane so nothing ever hides the
-     player. */
-  var BH_PROPS = [
-    // --- T Spawn yard ---
-    { t: 'hatch', x: 100, y: 3400, w: 220, h: 170 },
-    { t: 'truck', x: 420, y: 3130, w: 120, h: 190 },
-    { t: 'cont', x: 108, y: 2880, w: 132, h: 62 },
-    { t: 'cont', x: 108, y: 2960, w: 132, h: 62 },
-    { t: 'cont', x: 470, y: 2620, w: 62, h: 132 },
-    { t: 'bay', x: 430, y: 2860, w: 190, h: 240 },
-    // --- the connector ---
-    { t: 'pipe', x: 258, y: 1610, w: 34, h: 380 },
-    { t: 'curb', x: 620, y: 1450, w: 200, h: 14 },
-    { t: 'cont', x: 700, y: 1300, w: 130, h: 60 },
-    // --- Outside ---
-    { t: 'bay', x: 830, y: 1000, w: 160, h: 300 },
-    { t: 'cont', x: 858, y: 1080, w: 130, h: 60 },
-    { t: 'cont', x: 858, y: 1160, w: 130, h: 60 },
-    { t: 'hatch', x: 545, y: 1150, w: 150, h: 150 },
-    { t: 'pipe', x: 962, y: 300, w: 34, h: 420 },
-    { t: 'cont', x: 560, y: 380, w: 128, h: 60 },
-    { t: 'curb', x: 545, y: 640, w: 170, h: 14 }
-  ];
+     EVERYTHING that differs between routes lives in one object here, so a
+     third map is data rather than another branch inside the renderer.
 
-  // The route itself. Its total length IS the track: one source of truth, so
-  // the map can be reshaped without the win condition silently drifting.
-  var BH_PATH = [[330, 3470], [330, 1990], [760, 1290], [760, 100]];
-  var BH_SEGS = (function () {
+     Both are authored so the player runs toward -y (UP the screen), the only
+     layout that works on a 420-wide portrait phone. They reach that
+     differently, and the difference is deliberate:
+
+       NUKE  is ROTATED 90 degrees from its real radar. Real map north
+             therefore points screen-LEFT, which is why MAIN sits left of the
+             route and T RED right — that is where they really are relative to
+             the run, not an invented layout.
+       DUST 2 is UNROTATED. Its Long route already runs bottom-to-top on the
+             real radar, so screen-up is genuinely map-north here and every
+             callout sits where a player expects it.
+
+     Do not "make them consistent". Each is in whichever orientation keeps its
+     own callouts truthful. Baking the rotation into the DATA (rather than
+     yawing the camera each frame) keeps every rect axis-aligned, so the art
+     stays pixel-crisp and the labels stay upright for free.
+
+     Rects are [x, y, w, h, surface], where surface indexes theme.surf.
+     Anything NOT covered by a rect is structure. That inversion — negative
+     space as architecture — is what makes these read as places rather than as
+     radars, and it is why the structure colour must stay clearly separated in
+     luminance from every walkable surface (a test asserts it per map).
+  */
+
+  var BH_MAPS = {
+
+    /* ---------------------------------------------------------------- NUKE */
+    nuke: {
+      id: 'nuke',
+      name: 'NUKE',
+      leg: 'T SPAWN — OUTSIDE',
+      finishBanner: 'OUTSIDE — GG',
+      // surfaces: 0 asphalt yard (oil-stained loading area), 1 outdoor
+      // concrete, 2 building interior (neighbours passed but never entered)
+      theme: {
+        mass: '#5E6266',                                   // structure mass
+        seam: '#535759',
+        kerb: '#A2A69E',
+        surf: ['#42433E', '#8E9289', '#A9ADA4'],
+        route: '#D8AC33',                                  // painted plant arrows
+        detail: 'nuke',
+        backdrop: 'cedar'
+      },
+      rooms: [
+        // T SPAWN — a wide yard that necks down into the exit. The back wall
+        // sits well behind the spawn point (y 3596 vs a start of 3470) so the
+        // camera has something to show, rather than void, at the first frame.
+        [88, 2496, 544, 1100, 0], [192, 2240, 336, 256, 0], [240, 1960, 240, 280, 0],
+        // the connector: a staircase of rects carrying the route right and up
+        [240, 1760, 300, 240, 1], [240, 1600, 448, 160, 1],
+        [480, 1440, 352, 160, 1], [608, 1280, 288, 176, 1],
+        // OUTSIDE — the open concrete the run ends on
+        [528, 100, 472, 1360, 1],
+        // neighbours, so the plant feels like a place rather than a tube
+        [130, 260, 360, 640, 2],     // MAIN
+        [130, 940, 250, 200, 2],     // SQUEEKY
+        [1040, 1120, 160, 210, 2]    // T RED
+      ],
+      // Callouts are held off the running lane on purpose — a label centred on
+      // the route ends up permanently underneath the player sprite.
+      labels: [
+        ['T SPAWN', 185, 3150, 14], ['SILO', 585, 920, 11],   // sits ON the tank
+        ['OUTSIDE', 640, 300, 14], ['MINI', 900, 620, 11],
+        ['MAIN', 400, 620, 12], ['SQUEEKY', 250, 1040, 10], ['T RED', 1120, 1230, 10]
+      ],
+      // the ribbed steel tank, straddling the west wall as it does live
+      feature: { kind: 'silo', x: 585, y: 920, r: 92 },
+      /* Set dressing, all lifted from the two reference shots of the real
+         Outside: rust-orange shipping containers, the red delivery truck in T
+         Spawn, yellow hazard hatching and parking bays, silver pipe runs.
+         Everything sits clear of the running lane so nothing hides the player. */
+      props: [
+        // --- T Spawn yard ---
+        { t: 'hatch', x: 100, y: 3400, w: 220, h: 170 },
+        { t: 'truck', x: 420, y: 3130, w: 120, h: 190 },
+        { t: 'cont', x: 108, y: 2880, w: 132, h: 62 },
+        { t: 'cont', x: 108, y: 2960, w: 132, h: 62 },
+        { t: 'cont', x: 470, y: 2620, w: 62, h: 132 },
+        { t: 'bay', x: 430, y: 2860, w: 190, h: 240 },
+        // --- the connector ---
+        { t: 'pipe', x: 258, y: 1610, w: 34, h: 380 },
+        { t: 'curb', x: 620, y: 1450, w: 200, h: 14 },
+        // Was x:700 w:130, which put a solid steel container flat ON the lane
+        // at the top of the bend — measured clearance 0.0, i.e. the player ran
+        // straight through it every single run. Shifted right, into the same
+        // room, where it clears by 41 units.
+        { t: 'cont', x: 800, y: 1300, w: 96, h: 60 },
+        // --- Outside ---
+        { t: 'bay', x: 830, y: 1000, w: 160, h: 300 },
+        { t: 'cont', x: 858, y: 1080, w: 130, h: 60 },
+        { t: 'cont', x: 858, y: 1160, w: 130, h: 60 },
+        { t: 'hatch', x: 545, y: 1150, w: 150, h: 150 },
+        { t: 'pipe', x: 962, y: 300, w: 34, h: 420 },
+        { t: 'cont', x: 560, y: 380, w: 128, h: 60 },
+        { t: 'curb', x: 545, y: 640, w: 170, h: 14 }
+      ],
+      path: [[330, 3470], [330, 1990], [760, 1290], [760, 100]],
+      finishSpan: [528, 1000]
+    },
+
+    /* -------------------------------------------------------------- DUST 2 */
+    /* T SPAWN -> OUTSIDE LONG -> LONG DOUBLE DOORS -> LONG A -> A SITE, the
+       iconic long run, traced off the owner's radar shots. Its track length is
+       3486 units against Nuke's 3492 — within 6 — so ONE set of speed/beat
+       constants keeps both routes at the same "clean run ~9.4s, mashing loses"
+       tuning. Reshaping either route without re-checking that is how a map
+       silently becomes free; the suite asserts both ends for every map. */
+    dust2: {
+      id: 'dust2',
+      name: 'DUST 2',
+      leg: 'T SPAWN — A SITE',
+      finishBanner: 'A SITE — GG',
+      /* Dust 2 is the hard case for the structure/surface rule: on the real
+         map the walls are the SAME sandstone as the ground, so a literal
+         palette would make the route vanish. The radar itself solves this by
+         darkening everything unwalkable, and so do we — structure is a
+         deliberately darker, cooler ochre, and every walkable surface is
+         lighter and warmer. Measured separation is 53–104 units of luminance,
+         comfortably past the 24 the suite demands. */
+      theme: {
+        mass: '#6B5B42',                                   // structure mass
+        seam: '#5A4B36',
+        kerb: '#E0CFA8',
+        // 0 packed sand, 1 paved stone (the site platform, doubles), 2 shade
+        surf: ['#C4A87A', '#D6C49B', '#A88F66'],
+        route: '#E8DCC0',        // chalk scuff, not paint — yellow on sand reads wrong
+        detail: 'dust2',
+        backdrop: 'dome'
+      },
+      rooms: [
+        // T SPAWN — the wide sandy yard the run starts in
+        [120, 3280, 480, 460, 0],
+        // out of spawn, angling right toward Outside Long
+        [240, 2900, 420, 400, 0],
+        [380, 2600, 340, 320, 0],
+        // OUTSIDE LONG — open sand, the well sits here
+        [400, 2240, 360, 380, 0],
+        // LONG DOUBLE DOORS — the choke, paved and shaded
+        [480, 2040, 180, 220, 1],
+        // the dogleg into Long A
+        [520, 1720, 280, 340, 0],
+        // LONG A — the long straight
+        [590, 840, 240, 900, 0],
+        // A SITE — the paved platform the run ends on
+        [430, 140, 450, 720, 1],
+        // --- neighbours, never entered ---
+        [880, 1240, 190, 280, 2],   // PIT
+        [900, 240, 170, 320, 0],    // CARS
+        [150, 220, 250, 330, 2],    // CT SPAWN
+        [60, 1360, 210, 520, 2],    // CATWALK / MID
+        [60, 2700, 180, 300, 2]     // T RAMP
+      ],
+      labels: [
+        ['T SPAWN', 200, 3520, 13], ['T RAMP', 150, 2850, 10],
+        ['OUTSIDE', 440, 2420, 12], ['DOUBLES', 430, 2120, 10],
+        ['LONG A', 775, 1400, 12], ['PIT', 975, 1380, 10],
+        ['CATWALK', 165, 1450, 10], ['MID', 165, 1750, 10],
+        ['A SITE', 500, 400, 14], ['CARS', 985, 400, 10],
+        ['CT SPAWN', 275, 380, 10]
+      ],
+      // the stone well in Outside Long — Dust 2's answer to the silo, and the
+      // one round landmark on the route
+      feature: { kind: 'well', x: 450, y: 2380, r: 62 },
+      /* Set dressing from the owner's B-site reference shots, which are the
+         same vocabulary the whole map is built from: stacked wooden crates,
+         rust and blue barrels, the tarp-covered pallet, the beige cars, and
+         loose rubble. All clear of the running lane. */
+      props: [
+        // --- T Spawn ---
+        { t: 'crate', x: 140, y: 3540, w: 92, h: 92 },
+        { t: 'crate', x: 146, y: 3450, w: 74, h: 74 },
+        { t: 'barrel', x: 496, y: 3592, w: 46, h: 46, v: 0 },
+        { t: 'barrel', x: 538, y: 3616, w: 46, h: 46, v: 1 },
+        { t: 'rubble', x: 200, y: 3300, w: 130, h: 80 },
+        // --- out of spawn ---
+        { t: 'crate', x: 268, y: 3170, w: 80, h: 80 },
+        { t: 'pallet', x: 596, y: 3000, w: 92, h: 62 },
+        { t: 'barrel', x: 408, y: 2700, w: 44, h: 44, v: 1 },
+        { t: 'barrel', x: 448, y: 2676, w: 44, h: 44, v: 0 },
+        { t: 'crate', x: 648, y: 2820, w: 70, h: 70 },
+        // --- Outside Long ---
+        { t: 'crate', x: 688, y: 2300, w: 66, h: 66 },
+        { t: 'rubble', x: 618, y: 2500, w: 100, h: 70 },
+        /* --- Doubles. Both barrels sit LEFT of the lane: the room is only 180
+           units wide and the route cuts it diagonally, so the strip right of
+           the lane is too narrow to hold a barrel without either clipping on
+           the floor edge or standing in the player's path. */
+        { t: 'barrel', x: 486, y: 2196, w: 42, h: 42, v: 0 },
+        { t: 'barrel', x: 514, y: 2040, w: 42, h: 42, v: 1 },
+        // --- the dogleg ---
+        { t: 'crate', x: 738, y: 1900, w: 62, h: 62 },
+        { t: 'pallet', x: 528, y: 1780, w: 84, h: 56 },
+        // --- Long A, lining both sides of the straight ---
+        { t: 'crate', x: 598, y: 1600, w: 58, h: 58 },
+        { t: 'crate', x: 598, y: 1524, w: 58, h: 58 },
+        { t: 'barrel', x: 782, y: 1452, w: 44, h: 44, v: 1 },
+        { t: 'barrel', x: 782, y: 1400, w: 44, h: 44, v: 0 },
+        { t: 'rubble', x: 594, y: 1180, w: 62, h: 120 },
+        { t: 'crate', x: 776, y: 1046, w: 52, h: 52 },
+        { t: 'barrel', x: 604, y: 946, w: 44, h: 44, v: 0 },
+        // --- A site ---
+        { t: 'car', x: 756, y: 396, w: 112, h: 192 },
+        { t: 'crate', x: 466, y: 300, w: 84, h: 84 },
+        { t: 'crate', x: 472, y: 224, w: 66, h: 66 },
+        { t: 'barrel', x: 516, y: 616, w: 44, h: 44, v: 1 },
+        { t: 'barrel', x: 556, y: 640, w: 44, h: 44, v: 0 },
+        { t: 'pallet', x: 796, y: 700, w: 90, h: 60 },
+        { t: 'rubble', x: 470, y: 500, w: 110, h: 70 },
+        // --- the CARS neighbour ---
+        { t: 'car', x: 926, y: 300, w: 104, h: 180 }
+      ],
+      path: [[300, 3600], [560, 2760], [560, 2180], [700, 1760], [700, 900], [620, 180]],
+      finishSpan: [430, 880]
+    }
+  };
+
+  /* Segments and total track length, derived per map. The route's own length
+     IS the track — one source of truth, so a map can be reshaped without the
+     win condition silently drifting away from it. */
+  function bhBuildSegs(map) {
     var segs = [], i;
-    for (i = 0; i < BH_PATH.length - 1; i++) {
-      var a = BH_PATH[i], b = BH_PATH[i + 1];
+    for (i = 0; i < map.path.length - 1; i++) {
+      var a = map.path[i], b = map.path[i + 1];
       var dx = b[0] - a[0], dy = b[1] - a[1];
       segs.push({ x0: a[0], y0: a[1], x1: b[0], y1: b[1], len: Math.sqrt(dx * dx + dy * dy) });
     }
-    return segs;
+    map.segs = segs;
+    map.track = segs.reduce(function (t, s) { return t + s.len; }, 0);
+    return map;
+  }
+  var BH_IDS = Object.keys(BH_MAPS);
+  BH_IDS.forEach(function (k) { bhBuildSegs(BH_MAPS[k]); });
+
+  var lastMapId = null;
+  function pickMap() {
+    var pool = BH_IDS.filter(function (id) { return id !== lastMapId; });
+    lastMapId = pool[Math.floor(Math.random() * pool.length)] || BH_IDS[0];
+    return BH_MAPS[lastMapId];
+  }
+
+  /* ---- the player, as a real top-down operator ---------------------------
+     Authored as a BITMAP, not a stack of rects. The sprite this replaces was
+     four nested squares plus a stick, and read as exactly that: a box with a
+     pistol taped to the front. A grid is also the only sane way to keep a
+     silhouette this small editable.
+
+     Facing -y (up the screen), the direction of travel on both maps. 16x16 at
+     2px a cell = a 32px sprite. Read top to bottom it is: muzzle, barrel,
+     both gloves on the handguard, the receiver and its furniture, arms
+     opening out to the shoulders, the head seen from directly above, and the
+     pack on his back.
+  */
+  var BH_SPRITE = [
+    '.......##.......',
+    '.......MM.......',
+    '......#MM#......',
+    '......#MM#......',
+    '.....##MM##.....',
+    '....#GGMMGG#....',
+    '....#GGMMGG#....',
+    '...##SSMMSS##...',
+    '..#SSSSWWSSSS#..',
+    '.#SSVVVVVVVVSS#.',
+    '.#SVVVHHHHVVVS#.',
+    '.#SVVHHHHHHVVS#.',
+    '.#SVVHHHHHHVVS#.',
+    '.#SVVVHHHHVVVS#.',
+    '..#BBBBBBBBBB#..',
+    '...##########...'
+  ];
+  var BH_SPRITE_COLS = {
+    '#': '#14161B',   // outline
+    'M': '#2E323A',   // gun metal
+    'W': '#6B5434',   // furniture
+    'G': '#3A3128',   // glove
+    'S': '#C2A06A',   // sleeve
+    'V': '#8A7048',   // vest / torso
+    'H': '#4A3E2C',   // head from above
+    'B': '#5E4C31'    // pack
+  };
+  /* A dark outline ALONE vanishes on Nuke's near-black asphalt; a light one
+     alone washes out on Dust 2's pale stone. The sprite therefore carries
+     both: a one-cell cream halo dilated out of its own silhouette, painted
+     first, then the sprite with its dark outline on top. That reads on every
+     surface either map has.
+     Precomputed once — dilating 256 cells every frame for a shape that never
+     changes would be pure waste. */
+  var BH_SPRITE_HALO = (function () {
+    var rows = BH_SPRITE.length, cols = BH_SPRITE[0].length, out = [], y, x;
+    function solid(px2, py) {
+      return py >= 0 && py < rows && px2 >= 0 && px2 < cols && BH_SPRITE[py].charAt(px2) !== '.';
+    }
+    for (y = 0; y < rows; y++) {
+      out.push([]);
+      for (x = 0; x < cols; x++) {
+        out[y][x] = !solid(x, y) && (
+          solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1) ||
+          solid(x - 1, y - 1) || solid(x + 1, y - 1) ||
+          solid(x - 1, y + 1) || solid(x + 1, y + 1));
+      }
+    }
+    return out;
   })();
-  var BH_TRACK = BH_SEGS.reduce(function (t, s) { return t + s.len; }, 0);
+  var BH_SPRITE_CELL = 2;
+  // Row 11.5 is the middle of the torso. The sprite pivots THERE, not on the
+  // grid centre, so the strafe tilt swings the body rather than the muzzle.
+  var BH_SPRITE_PIVOT_ROW = 11.5;
+
+  function bhDrawPlayer(c) {
+    var cell = BH_SPRITE_CELL, rows = BH_SPRITE.length, cols = BH_SPRITE[0].length;
+    var ox = -cols * cell / 2, oy = -BH_SPRITE_PIVOT_ROW * cell, x, y, ch;
+    for (y = 0; y < rows; y++) {
+      for (x = 0; x < cols; x++) {
+        if (BH_SPRITE_HALO[y][x]) px(c, ox + x * cell, oy + y * cell, cell, cell, '#F4F1E8');
+      }
+    }
+    for (y = 0; y < rows; y++) {
+      for (x = 0; x < cols; x++) {
+        ch = BH_SPRITE[y].charAt(x);
+        if (ch !== '.') px(c, ox + x * cell, oy + y * cell, cell, cell, BH_SPRITE_COLS[ch]);
+      }
+    }
+  }
 
   /* Deterministic per-cell noise for the roof dressing. It must be a pure
      function of the world cell, never of frame count or Math.random — vents
@@ -845,23 +1101,24 @@
 
   // Where on the route a given distance lands. Used by the camera, the player
   // sprite and the guide chevrons alike.
-  function bhPathAt(d) {
-    var rem = clamp(d, 0, BH_TRACK), i;
-    for (i = 0; i < BH_SEGS.length; i++) {
-      var s = BH_SEGS[i];
-      if (rem <= s.len || i === BH_SEGS.length - 1) {
+  function bhPathAt(map, d) {
+    var rem = clamp(d, 0, map.track), i;
+    for (i = 0; i < map.segs.length; i++) {
+      var s = map.segs[i];
+      if (rem <= s.len || i === map.segs.length - 1) {
         var t = s.len ? clamp(rem / s.len, 0, 1) : 0;
         return { x: s.x0 + (s.x1 - s.x0) * t, y: s.y0 + (s.y1 - s.y0) * t,
                  ang: Math.atan2(s.y1 - s.y0, s.x1 - s.x0) };
       }
       rem -= s.len;
     }
-    return { x: BH_PATH[0][0], y: BH_PATH[0][1], ang: -Math.PI / 2 };
+    return { x: map.path[0][0], y: map.path[0][1], ang: -Math.PI / 2 };
   }
 
   function makeBhop() {
+    var map = pickMap();
     var dist = 0, speed = BH_MIN_SPEED;
-    var camX = BH_PATH[0][0]; // lags the player through the bend, so the turn
+    var camX = map.path[0][0]; // lags the player through the bend, so the turn
                               // sweeps instead of snapping
     var tilt = 0;
     var trail = [];
@@ -922,7 +1179,8 @@
         // the marker actually is now.
         if (now() >= introUntil) advance();
         return { dist: dist, speed: speed, beatT: markerPos(), nextSide: sweepDir(),
-                 beatMs: Math.round(beatMs()), intro: now() < introUntil, track: BH_TRACK };
+                 beatMs: Math.round(beatMs()), intro: now() < introUntil,
+                 track: map.track, mapId: map.id };
       },
       down: function (p) { tap(p.x < W / 2 ? -1 : 1); },
       update: function (dt) {
@@ -939,35 +1197,36 @@
           lastHalf = half();
         }
         dist += speed * dt;
-        camX += (bhPathAt(dist).x - camX) * Math.min(1, dt * 3.2);
+        camX += (bhPathAt(map, dist).x - camX) * Math.min(1, dt * 3.2);
         tilt *= 0.88;
         if (speed > 350) {
           trail.push({ d: dist, t: now() });
           if (trail.length > 14) trail.shift();
         }
-        if (dist >= BH_TRACK) {
+        if (dist >= map.track) {
           done = true;
-          setBanner('OUTSIDE — GG', 'good');
+          setBanner(map.finishBanner, 'good');
           beep('cash');
           setTimeout(win, 420);
         }
       },
       draw: function (c, w, h) {
         var S = BH_SCALE, i, r;
-        var me = bhPathAt(dist);
+        var T = map.theme;
+        var me = bhPathAt(map, dist);
         var playerY = h * 0.66;              // sit low so the run reads forward
         // World -> screen. Rounded, because a half-pixel wall edge on flat
         // radar art is exactly the blur this style cannot afford.
         function sx(wx) { return Math.round(w / 2 + (wx - camX) * S); }
         function sy(wy) { return Math.round(playerY + (wy - me.y) * S); }
 
-        /* ---- the plant itself: roof decks, the negative space of the route.
-           Cedar Creek's buildings are pale concrete with a blue service band,
-           and their roofs are covered in round silver ventilation cowls. */
-        // Deliberately darker and cooler than any walkable surface. The first
-        // pass made the roof deck and the outdoor concrete near-identical
-        // greys, and the route stopped reading as a route at all.
-        px(c, 0, 0, w, h, '#5E6266');                      // structure mass
+        /* ---- the structure: the negative space the route is cut out of.
+           Deliberately darker than every walkable surface. Nuke's first pass
+           made the roof deck and the outdoor concrete near-identical greys and
+           the route stopped reading as a route at all — and Dust 2 would hit
+           that harder still, since its real walls and floors are the same
+           sandstone (see the theme comment on the map). */
+        px(c, 0, 0, w, h, T.mass);                          // structure mass
         var CELL = 130;                                     // roof detail grid
         var wx0 = camX - (w / 2) / S, wy0 = me.y - (playerY) / S;
         var gi0 = Math.floor(wx0 / CELL), gj0 = Math.floor(wy0 / CELL);
@@ -976,61 +1235,112 @@
           for (var gj = 0; gj < rows; gj++) {
             var ci = gi0 + gi, cj = gj0 + gj;
             var bx = sx(ci * CELL), by = sy(cj * CELL), cs = CELL * S;
-            px(c, bx, by, cs, 2, '#535759');               // roof slab seams
-            px(c, bx, by, 2, cs, '#535759');
+            px(c, bx, by, cs, 2, T.seam);                  // slab seams
+            px(c, bx, by, 2, cs, T.seam);
             var rnd = bhHash(ci, cj);
-            if (rnd > 0.72) {                              // ventilation cowl
-              var vx = bx + 18 + (rnd * 100 % 30), vy = by + 16 + (rnd * 313 % 34);
-              px(c, vx, vy, 26, 20, '#A8ACAE');
-              px(c, vx + 2, vy + 2, 22, 12, '#C6CACC');
-              px(c, vx + 4, vy + 14, 18, 4, '#6E7274');
-            } else if (rnd < 0.10) {                       // roof plant / duct
-              px(c, bx + 22, by + 26, 44, 22, '#9CA09A');
-              px(c, bx + 22, by + 26, 44, 4, '#B6BAB4');
+            if (T.detail === 'nuke') {
+              /* Cedar Creek's roofs are covered in round silver ventilation
+                 cowls, with the odd plant room between them. */
+              if (rnd > 0.72) {                            // ventilation cowl
+                var vx = bx + 18 + (rnd * 100 % 30), vy = by + 16 + (rnd * 313 % 34);
+                px(c, vx, vy, 26, 20, '#A8ACAE');
+                px(c, vx + 2, vy + 2, 22, 12, '#C6CACC');
+                px(c, vx + 4, vy + 14, 18, 4, '#6E7274');
+              } else if (rnd < 0.10) {                     // roof plant / duct
+                px(c, bx + 22, by + 26, 44, 22, '#9CA09A');
+                px(c, bx + 22, by + 26, 44, 4, '#B6BAB4');
+              }
+            } else {
+              /* Dust 2 from above is a flat-roofed town: parapets, courtyards
+                 cut into the block, awnings, and the occasional small dome
+                 picking up the skyline from the reference shots. */
+              if (rnd > 0.80) {                            // small dome
+                var dcx = bx + 24 + (rnd * 100 % 24), dcy = by + 24 + (rnd * 313 % 28);
+                c.beginPath(); c.arc(dcx, dcy, 15, 0, Math.PI * 2);
+                c.fillStyle = '#3E4C5E'; c.fill();
+                c.beginPath(); c.arc(dcx, dcy, 11, 0, Math.PI * 2);
+                c.fillStyle = '#55708C'; c.fill();
+                c.beginPath(); c.arc(dcx, dcy, 4, 0, Math.PI * 2);
+                c.fillStyle = '#C9A648'; c.fill();
+              } else if (rnd < 0.16) {                     // open courtyard
+                px(c, bx + 20, by + 24, 50, 38, '#4E4231');
+                px(c, bx + 20, by + 24, 50, 3, '#877454');
+              } else if (rnd > 0.44 && rnd < 0.52) {       // cloth awning
+                px(c, bx + 26, by + 30, 40, 14, '#9A5B3C');
+                px(c, bx + 26, by + 30, 40, 4, '#B87550');
+              }
             }
           }
         }
-        /* The Cedar Creek building, sitting beyond the finish so it comes into
-           view as the player closes on Outside. It was first placed west of the
-           route, where MAIN's floor is drawn over the top of it and it never
-           appeared once. */
-        var bandX = sx(380), bandW = 780 * S;
-        px(c, bandX, sy(4), bandW, 86 * S, '#E4E8EA');     // pale plant facade
-        px(c, bandX, sy(38), bandW, 32 * S, '#3D8FC4');    // blue service band
-        px(c, bandX, sy(66), bandW, 7 * S, '#2A6C99');
-        px(c, bandX, sy(86), bandW, 5 * S, '#9DA1A3');
+        /* The landmark beyond the finish, so arriving somewhere LOOKS like
+           arriving somewhere. Both sit past the last waypoint and come into
+           view only on the final approach. Nuke's was first placed west of the
+           route, where MAIN's floor paints straight over it, and it never
+           appeared once — keep these beyond the finish, not beside it. */
+        if (T.backdrop === 'cedar') {
+          // the Cedar Creek plant: pale facade, blue service band
+          var bandX = sx(380), bandW = 780 * S;
+          px(c, bandX, sy(4), bandW, 86 * S, '#E4E8EA');
+          px(c, bandX, sy(38), bandW, 32 * S, '#3D8FC4');
+          px(c, bandX, sy(66), bandW, 7 * S, '#2A6C99');
+          px(c, bandX, sy(86), bandW, 5 * S, '#9DA1A3');
+        } else {
+          /* The great blue-and-gold dome from the reference shots, seen from
+             directly above as concentric rings. It sits behind A site, so it
+             rises over the site wall exactly as the player takes the last
+             stretch of Long. */
+          var domeX = sx(650), domeY = sy(-90), domeR = 230 * S;
+          if (domeY > -domeR - 60) {
+            var ring = [[1.00, '#2E3A48'], [0.94, '#6E7A66'], [0.86, '#2F4A66'],
+                        [0.62, '#3E628A'], [0.34, '#5A82AC'], [0.12, '#C9A648']];
+            for (i = 0; i < ring.length; i++) {
+              c.beginPath();
+              c.arc(domeX, domeY, domeR * ring[i][0], 0, Math.PI * 2);
+              c.fillStyle = ring[i][1]; c.fill();
+            }
+            // the gold ribs that run down the dome, foreshortened to spokes
+            c.strokeStyle = '#C9A648'; c.lineWidth = 2;
+            for (var rib = 0; rib < 16; rib++) {
+              var ra = rib / 16 * Math.PI * 2;
+              c.beginPath();
+              c.moveTo(domeX + Math.cos(ra) * domeR * 0.14, domeY + Math.sin(ra) * domeR * 0.14);
+              c.lineTo(domeX + Math.cos(ra) * domeR * 0.84, domeY + Math.sin(ra) * domeR * 0.84);
+              c.stroke();
+            }
+          }
+        }
 
         /* ---- floors. Drawn twice: a dark lip inflated by the wall thickness,
            then the exact surface on top. The second pass buries every shared
            internal edge, so a pile of overlapping rects comes out with one
            clean kerb around their union — no polygon union maths needed. */
         var WALL = 8;
-        var SURF = ['#42433E', '#8E9289', '#A9ADA4'];      // asphalt, concrete, interior
-        for (i = 0; i < BH_ROOMS.length; i++) {
-          r = BH_ROOMS[i];
+        var SURF = T.surf;
+        for (i = 0; i < map.rooms.length; i++) {
+          r = map.rooms[i];
           // Kerb lighter than the mass: it reads as a low wall catching the sun,
           // and gives the walkable area a continuous edge at any speed.
           px(c, sx(r[0]) - WALL, sy(r[1]) - WALL,
-             r[2] * S + WALL * 2, r[3] * S + WALL * 2, '#A2A69E');
+             r[2] * S + WALL * 2, r[3] * S + WALL * 2, T.kerb);
         }
-        for (i = 0; i < BH_ROOMS.length; i++) {
-          r = BH_ROOMS[i];
+        for (i = 0; i < map.rooms.length; i++) {
+          r = map.rooms[i];
           px(c, sx(r[0]), sy(r[1]), r[2] * S, r[3] * S, SURF[r[4]]);
         }
 
         /* Everything below is painted ON the ground, so it is clipped to the
-           floor union — otherwise hatching and containers spill onto roofs. */
+           floor union — otherwise hatching and crates spill onto roofs. */
         c.save();
         c.beginPath();
-        for (i = 0; i < BH_ROOMS.length; i++) {
-          r = BH_ROOMS[i];
+        for (i = 0; i < map.rooms.length; i++) {
+          r = map.rooms[i];
           c.rect(sx(r[0]), sy(r[1]), r[2] * S, r[3] * S);
         }
         c.clip();
 
         // ---- ground props ----
-        for (i = 0; i < BH_PROPS.length; i++) {
-          var P = BH_PROPS[i];
+        for (i = 0; i < map.props.length; i++) {
+          var P = map.props[i];
           var ax = sx(P.x), ay = sy(P.y), aw = P.w * S, ah = P.h * S;
           if (ay > h + 80 || ay + ah < -80) continue;      // off-camera
           if (P.t === 'hatch') {                            // yellow hazard hatching
@@ -1065,46 +1375,112 @@
             px(c, ax + aw * 0.18, ay, aw * 0.34, ah, '#D2D7DA');   // specular
             px(c, ax, ay, 3, ah, '#6E7478');
             for (var jt = 0; jt < ah; jt += 46) px(c, ax - 3, ay + jt, aw + 6, 7, '#B4BABE');
+          } else if (P.t === 'crate') {                     // Dust 2 wooden crate
+            px(c, ax, ay, aw, ah, '#3A2E1C');               // dark rim
+            px(c, ax + 2, ay + 2, aw - 4, ah - 4, '#A87B44');
+            px(c, ax + 2, ay + 2, aw - 4, 4, '#C2924F');    // lit top edge
+            px(c, ax + 2, ay + ah - 7, aw - 4, 5, '#7E5A31');
+            // plank seams, and the diagonal brace the real crates carry
+            for (var pk = 10; pk < ah - 6; pk += 13) px(c, ax + 3, ay + pk, aw - 6, 2, '#8A6436');
+            c.save(); c.beginPath(); c.rect(ax + 3, ay + 3, aw - 6, ah - 6); c.clip();
+            c.strokeStyle = '#8A6436'; c.lineWidth = 3;
+            c.beginPath(); c.moveTo(ax, ay + ah); c.lineTo(ax + aw, ay); c.stroke();
+            c.restore();
+          } else if (P.t === 'barrel') {                    // oil drum, from above
+            var br = aw / 2, bcx = ax + br, bcy = ay + br;
+            var bcol = P.v ? '#2E5F8A' : '#A85A2E';         // blue / rust, both on site
+            var blit = P.v ? '#4C82AE' : '#C87A44';
+            c.beginPath(); c.arc(bcx, bcy, br, 0, Math.PI * 2);
+            c.fillStyle = '#2A2118'; c.fill();
+            c.beginPath(); c.arc(bcx, bcy, br - 2, 0, Math.PI * 2);
+            c.fillStyle = bcol; c.fill();
+            c.beginPath(); c.arc(bcx, bcy, br * 0.62, 0, Math.PI * 2);
+            c.fillStyle = blit; c.fill();                   // the lid, catching light
+            c.beginPath(); c.arc(bcx, bcy, br * 0.22, 0, Math.PI * 2);
+            c.fillStyle = '#241C14'; c.fill();              // bung
+          } else if (P.t === 'car') {                       // the beige car at A
+            px(c, ax, ay, aw, ah, '#2A2620');               // shadow / tyres
+            px(c, ax + 3, ay + 6, aw - 6, ah - 12, '#C9BC96');
+            px(c, ax + 3, ay + 6, aw - 6, 4, '#DCD0AC');    // lit edge
+            px(c, ax + 7, ay + ah * 0.20, aw - 14, ah * 0.16, '#3E4A52');  // windscreen
+            px(c, ax + 7, ay + ah * 0.62, aw - 14, ah * 0.15, '#3E4A52');  // rear glass
+            px(c, ax + 8, ay + ah * 0.38, aw - 16, ah * 0.22, '#B3A783');  // roof
+            px(c, ax - 2, ay + ah * 0.16, 6, 16, '#1E1A16');               // wheels
+            px(c, ax + aw - 4, ay + ah * 0.16, 6, 16, '#1E1A16');
+            px(c, ax - 2, ay + ah * 0.70, 6, 16, '#1E1A16');
+            px(c, ax + aw - 4, ay + ah * 0.70, 6, 16, '#1E1A16');
+          } else if (P.t === 'pallet') {                    // tarp over a pallet
+            px(c, ax, ay, aw, ah, '#4A443A');
+            px(c, ax + 2, ay + 2, aw - 4, ah - 4, '#8A8C86');
+            px(c, ax + 2, ay + 2, aw - 4, 4, '#A2A49E');
+            for (var pl = 8; pl < aw - 4; pl += 12) px(c, ax + pl, ay + 3, 3, ah - 7, '#767871');
+          } else if (P.t === 'rubble') {                    // loose stone scatter
+            for (var rr = 0; rr < 14; rr++) {
+              var h1 = bhHash(P.x + rr * 7, P.y + rr * 13);
+              var h2 = bhHash(P.y + rr * 5, P.x + rr * 11);
+              var rw = 3 + Math.floor(h1 * 5);
+              px(c, ax + h1 * (aw - rw), ay + h2 * (ah - rw), rw, rw,
+                 h2 > 0.5 ? '#9A8256' : '#B09B70');
+            }
           }
         }
 
-        // ---- SILO: the ribbed steel tank, seen from directly above ----
-        var sxo = sx(BH_SILO[0]), syo = sy(BH_SILO[1]), sr = BH_SILO[2] * S;
+        // ---- the round landmark: Nuke's steel tank, Dust 2's stone well ----
+        var F = map.feature;
+        var sxo = sx(F.x), syo = sy(F.y), sr = F.r * S;
         if (syo > -sr - 40 && syo < h + sr + 40) {
-          c.beginPath(); c.arc(sxo, syo, sr, 0, Math.PI * 2); c.fillStyle = '#7E8386'; c.fill();
-          c.beginPath(); c.arc(sxo, syo, sr - 3, 0, Math.PI * 2); c.fillStyle = '#BFC4C7'; c.fill();
-          for (var ri = 0; ri < 24; ri++) {                // vertical ribs, from above
-            var a2 = ri / 24 * Math.PI * 2;
-            c.strokeStyle = '#9DA3A7'; c.lineWidth = 2;
-            c.beginPath();
-            c.moveTo(sxo + Math.cos(a2) * (sr - 4), syo + Math.sin(a2) * (sr - 4));
-            c.lineTo(sxo + Math.cos(a2) * (sr * 0.55), syo + Math.sin(a2) * (sr * 0.55));
-            c.stroke();
+          if (F.kind === 'silo') {
+            c.beginPath(); c.arc(sxo, syo, sr, 0, Math.PI * 2); c.fillStyle = '#7E8386'; c.fill();
+            c.beginPath(); c.arc(sxo, syo, sr - 3, 0, Math.PI * 2); c.fillStyle = '#BFC4C7'; c.fill();
+            for (var ri = 0; ri < 24; ri++) {              // vertical ribs, from above
+              var a2 = ri / 24 * Math.PI * 2;
+              c.strokeStyle = '#9DA3A7'; c.lineWidth = 2;
+              c.beginPath();
+              c.moveTo(sxo + Math.cos(a2) * (sr - 4), syo + Math.sin(a2) * (sr - 4));
+              c.lineTo(sxo + Math.cos(a2) * (sr * 0.55), syo + Math.sin(a2) * (sr * 0.55));
+              c.stroke();
+            }
+            c.beginPath(); c.arc(sxo, syo, sr * 0.55, 0, Math.PI * 2); c.fillStyle = '#D4D9DC'; c.fill();
+            c.beginPath(); c.arc(sxo, syo, sr * 0.18, 0, Math.PI * 2); c.fillStyle = '#8E9498'; c.fill();
+          } else {
+            // sandstone rim, laid course by course, around dark standing water
+            c.beginPath(); c.arc(sxo, syo, sr, 0, Math.PI * 2); c.fillStyle = '#6E5C3E'; c.fill();
+            c.beginPath(); c.arc(sxo, syo, sr - 3, 0, Math.PI * 2); c.fillStyle = '#C6AE7E'; c.fill();
+            c.strokeStyle = '#9A8256'; c.lineWidth = 2;
+            for (var bi = 0; bi < 18; bi++) {              // the courses of the rim
+              var ba = bi / 18 * Math.PI * 2;
+              c.beginPath();
+              c.moveTo(sxo + Math.cos(ba) * (sr - 4), syo + Math.sin(ba) * (sr - 4));
+              c.lineTo(sxo + Math.cos(ba) * (sr * 0.66), syo + Math.sin(ba) * (sr * 0.66));
+              c.stroke();
+            }
+            c.beginPath(); c.arc(sxo, syo, sr * 0.66, 0, Math.PI * 2); c.fillStyle = '#8A7450'; c.fill();
+            c.beginPath(); c.arc(sxo, syo, sr * 0.52, 0, Math.PI * 2); c.fillStyle = '#2E3A38'; c.fill();
+            c.beginPath(); c.arc(sxo - sr * 0.16, syo - sr * 0.16, sr * 0.14, 0, Math.PI * 2);
+            c.fillStyle = '#47585A'; c.fill();             // one glint on the water
           }
-          c.beginPath(); c.arc(sxo, syo, sr * 0.55, 0, Math.PI * 2); c.fillStyle = '#D4D9DC'; c.fill();
-          c.beginPath(); c.arc(sxo, syo, sr * 0.18, 0, Math.PI * 2); c.fillStyle = '#8E9498'; c.fill();
         }
 
-        // ---- the route, painted on the tarmac as yellow plant arrows ----
+        // ---- the route, scuffed along the ground as chevrons ----
         var step = 150;
         for (var d = Math.floor(dist / step) * step; d < dist + 1400; d += step) {
-          if (d <= dist + 120 || d > BH_TRACK - 60) continue;   // clear the sprite
-          var q = bhPathAt(d);
+          if (d <= dist + 120 || d > map.track - 60) continue;   // clear the sprite
+          var q = bhPathAt(map, d);
           c.save();
           c.translate(sx(q.x), sy(q.y));
           c.rotate(q.ang + Math.PI / 2);       // chevrons point along the route
           c.globalAlpha = 0.9;
-          px(c, -2, -9, 5, 20, '#D8AC33');
-          px(c, -11, -3, 9, 5, '#D8AC33');
-          px(c, 3, -3, 9, 5, '#D8AC33');
+          px(c, -2, -9, 5, 20, T.route);
+          px(c, -11, -3, 9, 5, T.route);
+          px(c, 3, -3, 9, 5, T.route);
           c.globalAlpha = 1;
           c.restore();
         }
 
-        // ---- the finish line, across Outside ----
-        var fy = sy(BH_PATH[BH_PATH.length - 1][1] + 40);
+        // ---- the finish line, across the last room ----
+        var fy = sy(map.path[map.path.length - 1][1] + 40);
         if (fy > -20 && fy < h + 20) {
-          for (var fx = sx(528); fx < sx(1000); fx += 26) {
+          for (var fx = sx(map.finishSpan[0]); fx < sx(map.finishSpan[1]); fx += 26) {
             px(c, fx, fy - 6, 13, 12, '#E8E8E4');
             px(c, fx + 13, fy - 6, 13, 12, '#22242A');
           }
@@ -1112,8 +1488,8 @@
         c.restore();
 
         // ---- callouts, as the chips the game itself draws over the world ----
-        for (i = 0; i < BH_LABELS.length; i++) {
-          var L = BH_LABELS[i];
+        for (i = 0; i < map.labels.length; i++) {
+          var L = map.labels[i];
           var lx = sx(L[1]), ly = sy(L[2]);
           if (ly < -20 || ly > h + 20) continue;
           var lw = L[0].length * L[3] * 0.62 + 16;
@@ -1125,23 +1501,19 @@
 
         // ---- motion trails above 350 u/s ----
         for (i = 0; i < trail.length; i++) {
-          var q2 = bhPathAt(trail[i].d);
+          var q2 = bhPathAt(map, trail[i].d);
           c.globalAlpha = (i / trail.length) * 0.34;
           px(c, sx(q2.x) - 7, sy(q2.y) - 7, 14, 14, '#7FA8C9');
           c.globalAlpha = 1;
         }
 
-        // ---- the player: a top-down T-side dot, tilted by the strafe ----
+        // ---- the player: the top-down operator sprite, tilted by the strafe.
+        // The tilt pivots on his torso (BH_SPRITE_PIVOT_ROW), not on the grid
+        // centre, so a strafe swings the body instead of waving the muzzle.
         c.save();
         c.translate(sx(me.x), sy(me.y));
         c.rotate(tilt * Math.PI / 180);
-        // Bright ring, not a dark one: the run crosses both black asphalt and
-        // pale concrete, and only a light outline survives both.
-        px(c, -13, -13, 26, 26, '#F2EFE6');
-        px(c, -10, -10, 20, 20, '#C89B54');                // shoulders
-        px(c, -7, -13, 14, 5, '#B0863F');
-        px(c, -6, -6, 12, 12, '#6E5636');                  // head from above
-        px(c, -2, -22, 4, 14, '#22242A');                  // rifle
+        bhDrawPlayer(c);
         c.restore();
 
         // ---- speedometer, top-centre ----
@@ -1168,15 +1540,19 @@
         px(c, arrX + (dirR ? 5 : 1), rbY + rbH / 2 - 5, 3, 10, '#FFD54A');
         pixelText(c, dirR ? 'TAP RIGHT' : 'TAP LEFT', w / 2, rbY - 18, 11, '#E8E2D0', 'center');
 
-        // ---- intro: big translucent A / D ----
+        // ---- intro: the map name, then the big translucent A / D ----
         if (now() < introUntil) {
           px(c, 0, 0, w, h, 'rgba(10,12,18,0.55)');
+          // Which map you drew is the first thing worth knowing, and with two
+          // routes it is no longer obvious from the first frame alone.
+          pixelText(c, map.name, w / 2, h * 0.26, 26, '#FFFFFF', 'center');
+          pixelText(c, map.leg, w / 2, h * 0.32, 12, '#E8C87A', 'center');
           var blink = (Math.floor(now() / 180) % 2) === 0;
           c.globalAlpha = blink ? 0.95 : 0.45;
-          pixelText(c, 'A', w * 0.25, h * 0.45, 92, '#FFFFFF', 'center');
-          pixelText(c, 'D', w * 0.75, h * 0.45, 92, '#FFFFFF', 'center');
+          pixelText(c, 'A', w * 0.25, h * 0.47, 92, '#FFFFFF', 'center');
+          pixelText(c, 'D', w * 0.75, h * 0.47, 92, '#FFFFFF', 'center');
           c.globalAlpha = 1;
-          pixelText(c, 'ALTERNATE TAPS ON THE BEAT', w / 2, h * 0.62, 12, '#E8E2D0', 'center');
+          pixelText(c, 'ALTERNATE TAPS ON THE BEAT', w / 2, h * 0.63, 12, '#E8E2D0', 'center');
         }
       }
     };
@@ -1234,6 +1610,12 @@
 
     // Test seam: force a specific game rather than the random pick.
     __force: function (id) { if (BUILDERS[id]) { startGame(id); return true; } return false; },
+
+    /* Test seam: the bhop map table itself, with each route's derived segments
+       and track length. The suite asserts the tuning holds for EVERY map
+       rather than regexing one hard-coded route out of the source, so adding a
+       third map is covered the moment it is added. */
+    __maps: function () { return BH_MAPS; },
     __win: win,
     __fail: fail
   };

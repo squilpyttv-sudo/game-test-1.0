@@ -1136,62 +1136,201 @@ check('d3 the AWP crosshair sits dead centre of the peek gap', function () {
     'the view through the doors should be clipped to an exact gap rect');
 });
 
-check('d3 the bhop map is textured as Nuke, not as a radar', function () {
+/* ---- V22f: the bhop maps -------------------------------------------------
+   These five REPLACE two earlier tests that regexed a single hard-coded route
+   (BH_PATH, BH_SILO, BH_PROPS, SURF) straight out of the source. That shape
+   could only ever describe ONE map, so it had to go the moment a second was
+   added. They now load the module and assert the RELATIONSHIP across every
+   entry in BH_MAPS — so a third map is covered the day it lands, instead of
+   silently escaping the suite (the same reasoning as the shop CATEGORY_ORDER
+   guard in test-v20-customise.js). */
+
+// js/matchgames.js is a plain IIFE over window.Game and touches no DOM at load
+// time, so it loads headlessly and its __maps() seam hands over real data
+// rather than text scraped with a regex.
+function loadMatchGames() {
   var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
-  ['hatch', 'cont', 'truck', 'pipe', 'bay', 'curb'].forEach(function (t) {
-    assert.ok(new RegExp("P\\.t === '" + t + "'").test(src), 'missing ground prop: ' + t);
-  });
-  assert.ok(/BH_PROPS/.test(src), 'the plant needs set dressing');
-  assert.ok(/BH_SILO/.test(src), 'the silo is the landmark in both reference shots');
-  // Structure must be darker than every walkable surface, or the route stops
-  // reading as a route. Compare luminance rather than trusting the comment.
-  var mass = /px\(c, 0, 0, w, h, '(#[0-9A-F]{6})'\);\s+\/\/ structure mass/.exec(src);
-  var surf = /var SURF = \['(#[0-9A-F]{6})', '(#[0-9A-F]{6})', '(#[0-9A-F]{6})'\]/.exec(src);
-  assert.ok(mass && surf, 'could not read the surface palette');
-  function lum(hex) {
-    return 0.2126 * parseInt(hex.slice(1, 3), 16) +
-           0.7152 * parseInt(hex.slice(3, 5), 16) +
-           0.0722 * parseInt(hex.slice(5, 7), 16);
+  var win = { Game: {} };
+  new Function('window', 'document', 'Date', 'Math', 'JSON', 'console', src)
+    (win, undefined, Date, Math, JSON, console);
+  return win.Game.MatchGames;
+}
+function bhLum(hex) {
+  return 0.2126 * parseInt(hex.slice(1, 3), 16) +
+         0.7152 * parseInt(hex.slice(3, 5), 16) +
+         0.0722 * parseInt(hex.slice(5, 7), 16);
+}
+// Sample the route densely; used by several checks below.
+function bhLanePoints(m, n) {
+  var out = [], k;
+  for (k = 0; k <= n; k++) {
+    var rem = m.track * k / n, p = null;
+    for (var i = 0; i < m.segs.length; i++) {
+      var g = m.segs[i];
+      if (rem <= g.len || i === m.segs.length - 1) {
+        var t = g.len ? Math.max(0, Math.min(1, rem / g.len)) : 0;
+        p = { x: g.x0 + (g.x1 - g.x0) * t, y: g.y0 + (g.y1 - g.y0) * t };
+        break;
+      }
+      rem -= g.len;
+    }
+    out.push(p);
   }
-  assert.ok(lum(surf[2]) - lum(mass[1]) > 24,
-    'outdoor concrete must be clearly lighter than the structure mass');
-  assert.ok(lum(mass[1]) - lum(surf[1]) > 24,
-    'the asphalt yard must be clearly darker than the structure mass');
-  // Roof dressing has to be a pure function of the world cell or it boils.
-  assert.ok(/function bhHash\(a, b\)/.test(src), 'roof scatter needs deterministic noise');
-  assert.ok(!/bhHash\([^)]*Math\.random/.test(src), 'roof scatter must not use Math.random');
+  return out;
+}
+
+check('d3 there are two bhop maps and the picker cannot repeat one', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  var maps = loadMatchGames().__maps();
+  var ids = Object.keys(maps);
+  assert.ok(ids.length >= 2, 'expected at least two bhop maps, got ' + ids.length);
+  assert.ok(ids.indexOf('nuke') !== -1 && ids.indexOf('dust2') !== -1,
+    'expected nuke and dust2, got ' + ids.join(','));
+  // Same no-immediate-repeat rule pickGame() and the music shuffle both need:
+  // with two maps a naive coin flip repeats half the time.
+  assert.ok(/function pickMap\(\)[\s\S]{0,240}id !== lastMapId/.test(src),
+    'pickMap() must exclude the last map drawn');
+  ids.forEach(function (id) {
+    var m = maps[id];
+    ['name', 'leg', 'finishBanner'].forEach(function (k) {
+      assert.ok(m[k] && m[k].length, id + ' is missing ' + k);
+    });
+    assert.ok(m.rooms.length && m.props.length && m.labels.length,
+      id + ' has no rooms/props/labels');
+    assert.ok(m.feature && m.feature.kind, id + ' has no round landmark');
+    assert.ok(m.finishSpan && m.finishSpan[1] > m.finishSpan[0], id + ' has no finish span');
+  });
 });
 
-check('d3 the Nuke route is winnable at top speed and lost at base speed', function () {
+check('d3 every bhop map is textured as a place, not as a radar', function () {
   var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
-  var m = /var BH_PATH = (\[\[[\s\S]*?\]\]);/.exec(src);
-  assert.ok(m, 'could not read the route');
-  var pathPts = JSON.parse(m[1]);
-  var track = 0, i;
-  for (i = 0; i < pathPts.length - 1; i++) {
-    var dx = pathPts[i + 1][0] - pathPts[i][0], dy = pathPts[i + 1][1] - pathPts[i][1];
-    track += Math.sqrt(dx * dx + dy * dy);
-  }
+  var maps = loadMatchGames().__maps();
+  // The prop vocabulary each map actually uses must have a renderer, or the
+  // prop silently draws nothing — the js/iso.js propMap trap, same shape.
+  Object.keys(maps).forEach(function (id) {
+    maps[id].props.forEach(function (P) {
+      assert.ok(new RegExp("P\\.t === '" + P.t + "'").test(src),
+        id + ' uses prop "' + P.t + '" with no renderer');
+    });
+  });
+  /* Structure must be clearly separated in luminance from EVERY walkable
+     surface, or the route stops reading as a route. Nuke needs its asphalt
+     darker and its concrete lighter, so the rule is a magnitude, not a
+     direction. Dust 2 is the hard case: its real walls and floors are the
+     same sandstone, so this is the check that keeps it legible at all. */
+  Object.keys(maps).forEach(function (id) {
+    var T = maps[id].theme;
+    assert.ok(/^#[0-9A-F]{6}$/i.test(T.mass), id + ' has no structure mass colour');
+    assert.strictEqual(T.surf.length, 3, id + ' needs three surfaces');
+    T.surf.forEach(function (s, i) {
+      var gap = Math.abs(bhLum(s) - bhLum(T.mass));
+      assert.ok(gap > 24, id + ' surface ' + i + ' (' + s + ') is only ' +
+        gap.toFixed(1) + ' from the structure mass — the route stops reading');
+    });
+  });
+  // Scatter must be a pure function of the world cell or it boils frame to frame.
+  assert.ok(/function bhHash\(a, b\)/.test(src), 'scatter needs deterministic noise');
+  assert.ok(!/bhHash\([^)]*Math\.random/.test(src), 'scatter must not use Math.random');
+});
+
+check('d3 every bhop route is winnable at top speed and lost at base speed', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  var maps = loadMatchGames().__maps();
   var lo = parseInt(/BH_MIN_SPEED = (\d+)/.exec(src)[1], 10);
   var hi = parseInt(/BH_MAX_SPEED = (\d+)/.exec(src)[1], 10);
   var slow = parseInt(/BH_BEAT_SLOW_MS = (\d+)/.exec(src)[1], 10);
   var fast = parseInt(/BH_BEAT_FAST_MS = (\d+)/.exec(src)[1], 10);
-  var intro = 1.3;                     // the A/D card, before the run starts
-  // Walk the actual ramp: +26 per good tap, on a traverse whose period slides
-  // from slow to fast as the speed climbs. Averaging it would flatter the
-  // player, because the slowest traverses are the ones they spend longest in.
-  var s = lo, t = 0, d = 0, guard = 0;
-  while (s < hi && guard++ < 200) {
-    var bm = slow + (fast - slow) * (s - lo) / (hi - lo);
-    t += bm / 1000;
-    d += s * bm / 1000;
-    s = Math.min(hi, s + 26);
-  }
-  var best = intro + t + Math.max(0, track - d) / hi;
-  var worst = intro + track / lo;      // someone mashing, never holding the beat
-  assert.ok(best < 13.5, 'a clean run must finish inside 15s, got ' + best.toFixed(1) + 's');
-  assert.ok(worst > 15, 'base speed alone must NOT reach Outside in 15s, got ' +
-    worst.toFixed(1) + 's — the minigame would be free');
+  var intro = 1.3;                     // the map card, before the run starts
+  var tracks = [];
+  Object.keys(maps).forEach(function (id) {
+    var track = maps[id].track;
+    tracks.push(track);
+    // Walk the actual ramp: +26 per good tap, on a traverse whose period
+    // slides from slow to fast as the speed climbs. Averaging it would flatter
+    // the player, because the slowest traverses are the ones they sit in longest.
+    var s = lo, t = 0, d = 0, guard = 0;
+    while (s < hi && guard++ < 400) {
+      var bm = slow + (fast - slow) * (s - lo) / (hi - lo);
+      t += bm / 1000;
+      d += s * bm / 1000;
+      s = Math.min(hi, s + 26);
+    }
+    var best = intro + t + Math.max(0, track - d) / hi;
+    var worst = intro + track / lo;    // someone mashing, never holding the beat
+    assert.ok(best < 13.5, id + ': a clean run must finish inside 15s, got ' +
+      best.toFixed(1) + 's');
+    assert.ok(worst > 15, id + ': base speed alone must NOT reach the finish in 15s, got ' +
+      worst.toFixed(1) + 's — the minigame would be free');
+  });
+  /* ONE set of speed/beat constants governs every map, so the routes have to
+     stay close to the same length. Let them drift apart and the two maps stop
+     being the same game — one becomes free, the other unwinnable. */
+  var spread = Math.max.apply(null, tracks) - Math.min.apply(null, tracks);
+  assert.ok(spread < 150, 'bhop track lengths differ by ' + spread.toFixed(0) +
+    ' units; one tuning cannot serve both');
+});
+
+check('d3 every bhop route stays on walkable floor, and props clear the lane', function () {
+  var maps = loadMatchGames().__maps();
+  // Painted ON the ground — the player is MEANT to run over these.
+  var FLAT = { hatch: 1, curb: 1, bay: 1, rubble: 1 };
+  var HALF_SPRITE = 30;   // the 32px sprite, back in world units, halved
+  Object.keys(maps).forEach(function (id) {
+    var m = maps[id], lane = bhLanePoints(m, 200);
+    // A route leaving the floor union means the player runs over bare
+    // structure — visually, straight through a building.
+    lane.forEach(function (p) {
+      var inside = m.rooms.some(function (r) {
+        return p.x >= r[0] && p.x <= r[0] + r[2] && p.y >= r[1] && p.y <= r[1] + r[3];
+      });
+      assert.ok(inside, id + ': the route leaves walkable floor at (' +
+        p.x.toFixed(0) + ',' + p.y.toFixed(0) + ')');
+    });
+    // A SOLID prop on the lane is a thing the player visibly runs through.
+    // This caught a shipped Nuke container sitting at clearance 0.0.
+    var fine = bhLanePoints(m, 900);
+    m.props.forEach(function (P) {
+      if (FLAT[P.t]) return;
+      var near = 1e9;
+      fine.forEach(function (p) {
+        var dx = Math.max(P.x - p.x, 0, p.x - (P.x + P.w));
+        var dy = Math.max(P.y - p.y, 0, p.y - (P.y + P.h));
+        near = Math.min(near, Math.sqrt(dx * dx + dy * dy));
+      });
+      assert.ok(near >= HALF_SPRITE, id + ': solid prop ' + P.t + '@' + P.x + ',' + P.y +
+        ' clears the lane by only ' + near.toFixed(1) + ' units — the player runs through it');
+    });
+  });
+});
+
+check('d3 the bhop player is a real sprite with a halo that survives both maps', function () {
+  var src = fs.readFileSync(path.join(ROOT, 'js/matchgames.js'), 'utf8');
+  // The sprite this replaced was four nested rects and a stick — a box with a
+  // pistol. A bitmap is the assertion that it is authored art now.
+  var m = /var BH_SPRITE = \[([\s\S]*?)\];/.exec(src);
+  assert.ok(m, 'the player must be a bitmap, not a pile of rects');
+  var rows = m[1].match(/'[^']*'/g).map(function (s) { return s.slice(1, -1); });
+  assert.ok(rows.length >= 12, 'sprite is too small to read as a person');
+  rows.forEach(function (r, i) {
+    assert.strictEqual(r.length, rows[0].length,
+      'sprite row ' + i + ' is ' + r.length + ', expected ' + rows[0].length);
+  });
+  // Every glyph used must have a colour, or that part of him renders as
+  // undefined and canvas silently paints nothing.
+  var cols = /var BH_SPRITE_COLS = \{([\s\S]*?)\};/.exec(src);
+  assert.ok(cols, 'no sprite palette');
+  rows.join('').split('').forEach(function (ch) {
+    if (ch === '.') return;
+    assert.ok(new RegExp("'" + ch + "':").test(cols[1]), 'sprite glyph ' + ch + ' has no colour');
+  });
+  /* The halo is the reason he reads on BOTH maps: a dark outline alone
+     disappears on Nuke's near-black asphalt, a light one washes out on Dust
+     2's pale stone, so he carries a dilated cream rim under a dark outline. */
+  assert.ok(/BH_SPRITE_HALO/.test(src), 'the sprite needs its dilated halo');
+  assert.ok(/BH_SPRITE_HALO = \(function/.test(src),
+    'the halo must be precomputed once, not dilated every frame');
+  // and he pivots on his torso, so a strafe swings the body not the muzzle
+  assert.ok(/BH_SPRITE_PIVOT_ROW/.test(src), 'the sprite needs an explicit pivot row');
 });
 
 check('d3 the bhop rhythm sweeps, and its period scales with speed', function () {
