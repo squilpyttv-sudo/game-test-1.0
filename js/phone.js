@@ -117,6 +117,17 @@
       '<path d="M15.1 8h3.7v3.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
     '</svg>';
 
+  // EMAIL (SPEC-V23 §3.1) — a plain envelope: the flap as a single V-fold,
+  // nothing else added, so it stays legible as a silhouette at 26px the same
+  // way the flat CAREER tag and SPONSORS tag do. NOT the '✉' glyph — that
+  // exact character was removed from js/career.js in the V20 icon sweep
+  // (ART-DIRECTION §2.5) and must not come back in anywhere.
+  var ICON_EMAIL =
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<rect x="2.5" y="5.5" width="19" height="14" rx="1.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>' +
+      '<path d="M3.5 7.2l8 6.1 8-6.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '</svg>';
+
   // INVENTORY (SPEC-V17 §5) — a cardboard box with its flaps folded open and
   // a tape strip down the seam. On a cardboard-brown tile the icon IS the
   // app: the box is the whole read, the way a real phone's app art is.
@@ -140,7 +151,8 @@
 
   var APP_ICON = {
     sponsors: ICON_SPONSORS, social: ICON_SOCIAL, crypto: ICON_CRYPTO,
-    career: ICON_CAREER, stats: ICON_STATS, inventory: ICON_BOX
+    career: ICON_CAREER, stats: ICON_STATS, inventory: ICON_BOX,
+    email: ICON_EMAIL
   };
 
   /* Tile base colours. css/phone.css is TOKENS-ONLY / zero raw hex, and
@@ -157,7 +169,14 @@
     crypto: 'var(--gold)',
     career: '#F58A2B',
     stats: '#63C7EB',
-    inventory: '#B07A45'   // cardboard brown
+    inventory: '#B07A45',  // cardboard brown
+    // EMAIL (SPEC-V23 §3.1) — envelope paper. Every other tile on this grid
+    // is a saturated hue, so a near-white one is the only value left that is
+    // instantly distinguishable at a glance; picking a seventh colour instead
+    // would have landed next to either STATS' blue or CAREER's orange. It
+    // also carries the dark default icon rather than joining APP_LIGHT_ICON,
+    // which is what makes the envelope read as ink on paper.
+    email: '#E8E2D0'
   };
 
   // SPEC-V17 §5 asks for WHITE icons on CAREER / STATS; INVENTORY's box
@@ -167,11 +186,13 @@
   // lighter #63C7EB fill rather than letting it wash out.
   var APP_LIGHT_ICON = { career: true, stats: true, inventory: true };
 
-  var APP_ORDER = ['sponsors', 'social', 'crypto', 'career', 'stats', 'inventory'];
+  // EMAIL leads (SPEC-V23 §3.1): it is the only tile whose contents EXPIRE,
+  // so it is the one the player most needs to see first on unlocking.
+  var APP_ORDER = ['email', 'sponsors', 'social', 'crypto', 'career', 'stats', 'inventory'];
 
   // Apps that hand off to a real G.Router screen. INVENTORY is not here —
   // it is a page of the handset (see openInventory()).
-  var APP_ROUTE = { sponsors: 'sponsors', social: 'social', crypto: 'crypto', career: 'career', stats: 'stats' };
+  var APP_ROUTE = { email: 'email', sponsors: 'sponsors', social: 'social', crypto: 'crypto', career: 'career', stats: 'stats' };
 
   function fmtCount(n) { return Math.round(n).toLocaleString('en-US'); }
 
@@ -286,7 +307,20 @@
     var scrimStatus = State.scrimQuotaStatus ? State.scrimQuotaStatus() : null;
     var scrimUnmet = !!(scrimStatus && !scrimStatus.met);
 
+    // SPEC-V23 §3.1: EMAIL is unlocked from day one and never gated. V23
+    // exists to give ACT ONE something to do, so gating its one new surface
+    // behind progress would defeat the whole feature. Note d.phoneUnlocked
+    // gates nothing any more (V22 item 5) and must not be consulted here.
+    // The dot is State.unreadEmailCount() rather than a locally recounted
+    // copy — deriving, never mirroring (HANDOFF-V2 §5.4).
+    var unread = 0;
+    try { unread = (State.unreadEmailCount && State.unreadEmailCount()) || 0; } catch (e) { unread = 0; }
+
     return [
+      {
+        id: 'email', name: 'EMAIL', unlocked: true, unlockLabel: null,
+        notifCount: unread, progress: null
+      },
       {
         id: 'career', name: 'CAREER', unlocked: true, unlockLabel: null,
         notifCount: (pending || scrimUnmet) ? 1 : 0, progress: null

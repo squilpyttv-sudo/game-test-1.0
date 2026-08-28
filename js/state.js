@@ -1016,9 +1016,26 @@
                                   // runs a charge (paid OR missed) — d.rentMissed only counts MISSES, so a
                                   // player who has always paid on time would never trip a miss-based check.
                                   // Latched (never re-locked) by applyRent(), exactly like applyPhoneUnlocks.
-      scrimEverCompleted: false  // §1 `first_scrim` trigger: true the first time State.scrim() ever
+      scrimEverCompleted: false, // §1 `first_scrim` trigger: true the first time State.scrim() ever
                                   // succeeds — d.scrimsToday resets to 0 every wake, so it cannot answer
                                   // "has the player EVER completed one". Latched by State.scrim() below.
+
+      /* ---- SPEC-V23 additions (additive — everything above is untouched) ----
+         ALL FOUR MUST live here — normalizeSave() only copies keys present in
+         defaultData(), so a field missing from this object is silently
+         dropped on load (this has now shipped broken NINE times — see
+         SPEC-V23-QUESTS.md §7). Do NOT also add a top-level mirror of
+         anything stored PER EMAIL (e.g. an entry's `read`/`state`) — `emails`
+         is copied wholesale by the generic normalizeSave() loop below, so
+         per-entry fields already round-trip with no extra code, exactly like
+         `placed[i]`'s `tint`/`designId`/`closed` do (HANDOFF-V2 §5.1). A
+         top-level mirror would be the second-copy bug instead. */
+      emails: [],          // the inbox — newest LAST (State.emails() reverses to newest-first, §8).
+                            // Capped at 30, oldest RESOLVED entry dropped first (§3.2).
+      emailSeq: 0,          // monotonic id counter for email ids (genId() is per-category, not
+                            // guaranteed unique across categories — this is the email inbox's own counter)
+      lastInviteDay: 0,     // day the last quest invite was generated — drives the §4.2 cadence roll
+      scoutStage: 0         // highest scout stage already fired (latched, never re-fired — §6)
     };
   }
 
@@ -2636,6 +2653,13 @@
     // have had their chance to move d.cash — catches a threshold crossed by
     // this very day's income instantly, rather than waiting for next tick.
     applyPhoneUnlocks(d);
+
+    // SPEC-V23 §4.2: quest invites + scout interest are rolled at END DAY,
+    // same as every other day-advancing rule above — this fires for every
+    // caller of resolveNewDay() (State.endDay() and the interactive
+    // sleep/wake flow alike), not just one of them. Placed last so it reads
+    // the CURRENT (post-increment) d.day and this day's final d.elo.
+    rollDailyEmails(d);
   }
 
   // doTick: pure mutation of `d` based on elapsed wall-clock time since
@@ -6605,6 +6629,335 @@
       needed: SOCIAL_UNLOCK_FOLLOWERS,
       apps: apps
     };
+  };
+
+  /* ---- SPEC-V23: quest invites, the email inbox, and scout interest -------
+     Package Q owns js/data.js + js/state.js only — js/email.js (the inbox
+     UI) and js/clutch.js (THE CLUTCH minigame) are separate packages reading
+     this API. See SPEC-V23-QUESTS.md §§4/6/7/8. */
+
+  // findQuestInvite: the single lookup for a Data.questInvites entry by id —
+  // every caller below goes through this rather than re-scanning the array
+  // itself (HANDOFF-V2 §5.4).
+  function findQuestInvite(id) {
+    var list = Data().questInvites || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  }
+
+  // pickInviteTierForElo: the highest-tier Data.questInvites entry whose
+  // eloMin the given ELO meets (§4.2: "track the player's climb rather than
+  // spamming café games at 1,800 ELO"). Single source for BOTH the daily
+  // cadence roll AND the scout-stage-3 trial invite (§6) — a future retune
+  // of "which tier do I qualify for" then only has one place to change.
+  function pickInviteTierForElo(elo) {
+    var list = Data().questInvites || [];
+    var best = null;
+    for (var i = 0; i < list.length; i++) {
+      if ((elo || 0) >= list[i].eloMin && (!best || list[i].eloMin > best.eloMin)) best = list[i];
+    }
+    return best;
+  }
+
+  function findEmailIdx(d, id) {
+    var list = d.emails || [];
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return i;
+    return -1;
+  }
+
+  // liveInvitesCount: 'open' (not yet accepted) OR 'accepted' (accepted, the
+  // minigame hasn't resolved it yet) both count as "live" against
+  // Data.questInviteMaxOpen — an accepted-but-unplayed invite still occupies
+  // a slot, or the player could accept both open invites, sit on them
+  // forever, and the cadence roll would keep generating more regardless.
+  function liveInvitesCount(d) {
+    var n = 0;
+    var list = d.emails || [];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e.kind === 'invite' && (e.state === 'open' || e.state === 'accepted')) n++;
+    }
+    return n;
+  }
+
+  // capEmails: hold the inbox at 30 (§3.2), dropping the OLDEST *resolved*
+  // entry first — `emails` is oldest-first internally (State.emails()
+  // reverses it to newest-first on read), so the first non-open/-accepted
+  // entry scanning from the front is the oldest settled one. An email still
+  // 'open' or 'accepted' is never dropped out from under the player, even if
+  // that means briefly exceeding 30 (can't happen in practice: at most
+  // Data.questInviteMaxOpen invites are ever live at once, far under 30).
+  function capEmails(d) {
+    var MAX = 30;
+    while ((d.emails || []).length > MAX) {
+      var idx = -1;
+      for (var i = 0; i < d.emails.length; i++) {
+        var st = d.emails[i].state;
+        if (st !== 'open' && st !== 'accepted') { idx = i; break; }
+      }
+      if (idx === -1) break; // everything left is still live — nothing safe to drop
+      d.emails.splice(idx, 1);
+    }
+  }
+
+  // pickTeamName: the ONLY sender-name source for quest/scout mail — reuses
+  // the existing 100-team roster (Data.teams) rather than authoring a
+  // second name list, which is exactly the second-copy pattern that has
+  // caused four user-visible bugs already (HANDOFF-V2 §5.4/spec §3.3).
+  function pickTeamName(d) {
+    var teams = Data().teams || [];
+    if (!teams.length) return 'AN UNKNOWN ORG';
+    return teams[randInt(0, teams.length - 1)].name;
+  }
+
+  // makeInviteEmail: builds and appends a normal (non-scout) quest-invite
+  // email for the given Data.questInvites tier. The email's `state` starts
+  // 'open' — accepting/resolving it is entirely State.acceptInvite()/
+  // State.resolveInvite()'s job below, never done here. `scoutStage` is
+  // deliberately absent here (undefined, not even written) — it exists ONLY
+  // to mark an email as scout-originated (see fireScoutStageEmail below), so
+  // a cadence-rolled invite must never carry it, or "did stage N fire" stops
+  // being answerable from the data.
+  function makeInviteEmail(d, tier) {
+    var id = 'em' + (d.emailSeq = (d.emailSeq || 0) + 1);
+    var from = pickTeamName(d);
+    var email = {
+      id: id, kind: 'invite', inviteId: tier.id, from: from, subject: tier.name,
+      body: from + ' wants you for ' + tier.name + '. Win it and the purse is $' + tier.purse + ', plus ' + tier.winElo + ' ELO. Lose and it costs you ' + Math.abs(tier.loseElo) + ' ELO.',
+      day: d.day, read: false, state: 'open', expiresDay: d.day + (Data().questInviteExpiryDays || 3)
+    };
+    d.emails.push(email);
+    capEmails(d);
+    return email;
+  }
+
+  // fireScoutStageEmail (§6): every email fired here is stamped with
+  // `scoutStage: def.stage` (the 1-based stage number) — on the stage-3
+  // trial invite AND on the three kind:'scout' informational ones alike.
+  // This is a per-entry field on emails[i], so it round-trips through
+  // normalizeSave()'s wholesale array copy for free (HANDOFF-V2 §5.1) — no
+  // defaultData() change, and specifically NOT a top-level mirror (that is
+  // the second-copy bug the same trap warns about). Without it, a
+  // scout-originated invite is byte-for-byte indistinguishable from a
+  // cadence-rolled one in the saved data, and "did stage 3 fire, exactly
+  // once" becomes unanswerable except by hardcoding "3 of the 4 stages
+  // happen to be kind:'scout'" — which silently breaks the moment a stage is
+  // added or reordered. Stage 3 is special — its email doubles as a
+  // real, playable invite (kind: 'invite', reusing the SAME accept/resolve
+  // pipeline every other quest invite uses — "a distinct, harder variant" is
+  // still open per spec §10 item 3, so this deliberately does NOT reimplement
+  // anything). Stages 1/2/4 are informational only (kind: 'scout') — stage 4
+  // explicitly hands off to the existing offers flow rather than mirroring
+  // it (spec §6: "must not reimplement offers").
+  //
+  // Deliberately NOT gated on Data.questInviteMaxOpen: that cap belongs to
+  // the §4.2 cadence roll (a repeating background system that must be kept
+  // from flooding the inbox); a scout stage fires AT MOST ONCE EVER per
+  // save (latched by d.scoutStage), so it cannot flood anything, and
+  // skipping/deferring it here would break "fires the first time it is
+  // crossed" — there would be no later moment to retry from.
+  function fireScoutStageEmail(d, def) {
+    var id = 'em' + (d.emailSeq = (d.emailSeq || 0) + 1);
+    var team = (def.stage === 2 || def.stage === 3) ? pickTeamName(d) : null;
+    var body = def.body.replace('{team}', team || '');
+    var email;
+    if (def.stage === 3) {
+      var tier = pickInviteTierForElo(d.elo || 0) || findQuestInvite('cafe');
+      email = {
+        id: id, kind: 'invite', inviteId: tier ? tier.id : null, scoutStage: def.stage,
+        from: team || 'SCOUT', subject: def.subject, body: body,
+        day: d.day, read: false, state: 'open', expiresDay: d.day + (Data().questInviteExpiryDays || 3)
+      };
+    } else {
+      var sender = def.stage === 1 ? 'SCOUTING DESK' : (def.stage === 4 ? 'SCOUTING NETWORK' : team);
+      email = {
+        id: id, kind: 'scout', inviteId: null, scoutStage: def.stage,
+        from: sender, subject: def.subject, body: body,
+        // Informational mail never expires on its own — only a kind:'invite'
+        // entry is swept for expiry below, so this deliberately has no
+        // expiresDay to count down.
+        day: d.day, read: false, state: 'open', expiresDay: null
+      };
+    }
+    d.emails.push(email);
+    capEmails(d);
+    return email;
+  }
+
+  // rollDailyEmails: the real logic behind State.rollDailyEmails() below —
+  // pure mutation of `d`, called from resolveNewDay() so EVERY day-advancing
+  // path (State.endDay(), the interactive sleep/wake flow) rolls it, exactly
+  // like tryGenerateOffers()/maybeRunLeagueCycle() above (§4.2: "rolled at
+  // END DAY"). Order matters: expire stale invites BEFORE generating a new
+  // one, so a just-expired slot can immediately be refilled the same day.
+  function rollDailyEmails(d) {
+    if (!d.emails) d.emails = [];
+
+    // 1) expiry sweep (§4.2) — invites only; marks 'expired', never deletes.
+    for (var i = 0; i < d.emails.length; i++) {
+      var e = d.emails[i];
+      if (e.kind === 'invite' && e.state === 'open' && e.expiresDay != null && d.day > e.expiresDay) {
+        e.state = 'expired';
+      }
+    }
+
+    // 2) quest invite cadence (§4.2): re-rolled fresh each call, matching
+    // the spec's literal formula rather than pre-committing to one gap like
+    // nextOfferEligibleDay does — the cadence only ever gates WHETHER a
+    // roll happens, never WHICH tier, so re-rolling it daily is harmless.
+    var gapRange = Data().questInviteIntervalDays || [3, 5];
+    var gap = randInt(gapRange[0], gapRange[1]);
+    if (d.day - (d.lastInviteDay || 0) >= gap && liveInvitesCount(d) < (Data().questInviteMaxOpen || 2)) {
+      var tier = pickInviteTierForElo(d.elo || 0);
+      if (tier) {
+        makeInviteEmail(d, tier);
+        d.lastInviteDay = d.day;
+      }
+    }
+
+    // 3) scout interest (§6): fire EVERY newly-crossed stage this call, in
+    // ascending order, each latching d.scoutStage immediately. A single call
+    // could otherwise skip a stage entirely if a big ELO swing (e.g. a won
+    // INVITATIONAL, +300) jumps clean over one between two rolls.
+    var stages = Data().scoutStages || [];
+    var elo = d.elo || 0;
+    var crossed = [];
+    for (var s = 0; s < stages.length; s++) {
+      if (stages[s].stage > (d.scoutStage || 0) && elo >= stages[s].elo) crossed.push(stages[s]);
+    }
+    crossed.sort(function (a, b) { return a.stage - b.stage; });
+    for (var c = 0; c < crossed.length; c++) {
+      fireScoutStageEmail(d, crossed[c]);
+      d.scoutStage = crossed[c].stage; // latched — never re-fires (§6, §7)
+    }
+  }
+
+  // State.emails(): newest first, a copy — `emails` is stored oldest-last
+  // (§7) so the UI never has to re-sort.
+  State.emails = function () {
+    return (State.data.emails || []).slice().reverse();
+  };
+
+  State.unreadEmailCount = function () {
+    var list = State.data.emails || [];
+    var n = 0;
+    for (var i = 0; i < list.length; i++) if (!list[i].read) n++;
+    return n;
+  };
+
+  State.readEmail = function (id) {
+    var d = State.data;
+    var idx = findEmailIdx(d, id);
+    if (idx === -1) return { ok: false, reason: 'UNKNOWN EMAIL' };
+    d.emails[idx].read = true;
+    commit();
+    return { ok: true };
+  };
+
+  // State.acceptInvite (§1 — THE LOAD-BEARING RULE): this deliberately does
+  // the OPPOSITE of State.playMatch(), which pre-rolls its result before its
+  // minigame overlay even opens. A quest is opt-in side content off the
+  // critical path, so THE CLUTCH minigame itself is the decider — accepting
+  // here changes NO cash and NO ELO, only the email's own state. Do not
+  // "fix" this to match playMatch()'s ordering; that inversion is the entire
+  // point of the feature (see State.resolveInvite() below, which the
+  // minigame's completion callback calls with the real outcome).
+  State.acceptInvite = function (id) {
+    var d = State.data;
+    var idx = findEmailIdx(d, id);
+    if (idx === -1) return { ok: false, reason: 'UNKNOWN EMAIL' };
+    var e = d.emails[idx];
+    if (e.kind !== 'invite') return { ok: false, reason: 'NOT AN INVITE' };
+    if (e.state === 'expired') return { ok: false, reason: 'EXPIRED' };
+    if (e.state !== 'open') return { ok: false, reason: 'ALREADY RESOLVED' };
+    var tier = findQuestInvite(e.inviteId);
+    if (tier && (d.elo || 0) < tier.eloMin) return { ok: false, reason: 'ELO TOO LOW' };
+    e.state = 'accepted';
+    e.read = true;
+    commit();
+    return {
+      ok: true,
+      invite: tier ? {
+        id: tier.id, name: tier.name, purse: tier.purse, winElo: tier.winElo,
+        loseElo: tier.loseElo, loseCash: tier.loseCash, enemies: tier.enemies, exposeMs: tier.exposeMs
+      } : null
+    };
+  };
+
+  // State.resolveInvite (§1): called BY THE MINIGAME's completion callback
+  // with what the player actually achieved — this file never decides `won`
+  // itself. See State.acceptInvite() above for why acceptance never touches
+  // cash/ELO: this is the ONLY place either currency moves for a quest.
+  State.resolveInvite = function (id, won) {
+    var d = State.data;
+    var idx = findEmailIdx(d, id);
+    if (idx === -1) return { ok: false, reason: 'UNKNOWN EMAIL' };
+    var e = d.emails[idx];
+    if (e.kind !== 'invite') return { ok: false, reason: 'NOT AN INVITE' };
+    if (e.state === 'expired') return { ok: false, reason: 'EXPIRED' };
+    if (e.state !== 'accepted') return { ok: false, reason: 'ALREADY RESOLVED' };
+    var tier = findQuestInvite(e.inviteId);
+    if (!tier) return { ok: false, reason: 'UNKNOWN EMAIL' };
+    var cash, elo;
+    if (won) {
+      cash = tier.purse; elo = tier.winElo; e.state = 'won';
+    } else {
+      cash = tier.loseCash; elo = tier.loseElo; e.state = 'lost';
+    }
+    d.cash += cash;
+    d.elo = Math.max(0, (d.elo || 0) + elo);
+    commit();
+    return { ok: true, cash: cash, elo: elo };
+  };
+
+  // State.declineInvite: settles an OPEN invite without playing it — no cash,
+  // no ELO, either direction. Maps to 'expired' (not a sixth state outside
+  // the §7 schema's five) since the visible effect is identical: gone,
+  // unplayed, settled in the player's own history.
+  State.declineInvite = function (id) {
+    var d = State.data;
+    var idx = findEmailIdx(d, id);
+    if (idx === -1) return { ok: false, reason: 'UNKNOWN EMAIL' };
+    var e = d.emails[idx];
+    if (e.kind !== 'invite') return { ok: false, reason: 'NOT AN INVITE' };
+    if (e.state === 'expired') return { ok: false, reason: 'EXPIRED' };
+    if (e.state !== 'open') return { ok: false, reason: 'ALREADY RESOLVED' };
+    e.state = 'expired';
+    e.read = true;
+    commit();
+    return { ok: true };
+  };
+
+  // State.rollDailyEmails(): the public entry point mirrored by
+  // resolveNewDay() (called automatically on every day advance, §4.2) — also
+  // exposed directly so the suite (and any future caller) can drive the
+  // exact same code path without waiting for a full endDay().
+  State.rollDailyEmails = function () {
+    var d = State.data;
+    rollDailyEmails(d);
+    commit();
+    return { ok: true };
+  };
+
+  // State.scoutStatus (§6): a pure readout derived from d.elo/d.scoutStage
+  // against Data.scoutStages — NOT a new stored economy. `interest` is 0..1
+  // progress toward the next un-fired stage; 1 once every stage has fired.
+  State.scoutStatus = function () {
+    var d = State.data;
+    var stages = Data().scoutStages || [];
+    var stage = d.scoutStage || 0;
+    var elo = d.elo || 0;
+    var prevElo = 0, next = null;
+    for (var i = 0; i < stages.length; i++) {
+      if (stages[i].stage === stage) prevElo = stages[i].elo;
+      if (stages[i].stage === stage + 1) next = stages[i];
+    }
+    if (!next) {
+      return { interest: 1, stage: stage, label: stages.length ? stages[stages.length - 1].subject : 'FULLY SCOUTED' };
+    }
+    var span = Math.max(1, next.elo - prevElo);
+    var interest = clamp((elo - prevElo) / span, 0, 1);
+    return { interest: interest, stage: stage, label: next.subject };
   };
 
   State.findShopItem = findShopItem;

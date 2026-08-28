@@ -1,0 +1,420 @@
+/* ==========================================================================
+   CS2 PRO SIMULATOR — css/email.css
+   The EMAIL app screen (SPEC-V23-QUESTS.md §3.2). A new surface inside the
+   established V16/V18 world — deep navy grounds, 1px true-black outlines,
+   hard unblurred shadows, 3-4px radius, monospace uppercase, resource
+   colours carrying meaning. No second identity is invented here.
+
+   TOKENS ONLY. Every colour is a var(--...) from css/tokens.css; the only
+   literals are rgba() inner-bevel washes, exactly as css/phone.css does.
+   Zero raw hex (checked mechanically, HANDOFF-V2 §2.4).
+
+   THE ONE IDEA THIS SHEET IS BUILT ON: a mail row's VALUE says whether it is
+   still alive. Live mail sits on the raised list-row value with white ink;
+   settled mail (won / lost / closed) drops to the recessed --row-b well with
+   --ink-dim and a stated badge. Nothing is hidden or deleted — the player
+   reads their own history — but a live invite is never in a tie with it.
+   ========================================================================== */
+
+.email-screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 10px;
+  gap: 10px;
+}
+
+/* The two views share the one #screen-email root and swap on a class — the
+   same mechanism the phone's lock screen and inventory page already use, so
+   stepping back to the inbox costs no rebuild and no scroll reset. */
+.email-list { display: flex; flex-direction: column; gap: 10px; }
+.email-detail { display: none; flex-direction: column; gap: 10px; }
+.email--detail .email-list { display: none; }
+.email--detail .email-detail { display: flex; }
+
+/* ---- header ----------------------------------------------------------- */
+/* The unread count lives in the header rather than on a tile so the number
+   is answered the moment the app opens. --num-warm + the 1px black text
+   outline is the house treatment for a live stat (V18 §2.6). */
+.email__count {
+  margin-left: auto;
+  margin-right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  color: var(--ink-dim);
+}
+.email__count--hot { color: var(--num-warm); text-shadow: var(--text-outline); }
+
+/* A 61x31 back control shipped on this screen once. .screen-header__back's
+   8px/10px padding gives ~31px, so the floor is stated here rather than
+   inherited — this screen's own override, not a change to the shared rule. */
+.email__exit { min-height: 44px; min-width: 66px; }
+
+/* ---- scout interest strip (spec §6) -----------------------------------
+   Deliberately a thin strip, not a card: it answers "why is nobody writing
+   to me" but must never outweigh a live invite in the list below it. */
+.email-scout { padding: 8px 10px 9px; }
+.email-scout__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.email-scout__title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.email-scout__pct {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--num-cool);
+  text-shadow: var(--text-outline);
+}
+.email-scout__meter {
+  height: 6px;
+  margin: 6px 0 5px;
+  background: var(--slot-fill);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  overflow: hidden;
+}
+.email-scout__fill { display: block; height: 100%; width: 0%; background: var(--views); }
+.email-scout__fill--max { background: var(--gold); }
+.email-scout__sub {
+  font-size: 8.5px;
+  line-height: 1.45;
+  letter-spacing: .3px;
+  color: var(--ink-dim);
+}
+
+/* ---- the one-line state of the inbox ---------------------------------- */
+.email__summary {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: .5px;
+  color: var(--ink-dim);
+  padding: 0 2px;
+}
+.email__summary--live { color: var(--num-warm); text-shadow: var(--text-outline); }
+
+/* ---- list rows -------------------------------------------------------
+   V18 §5.3's list anatomy: alternating row values, a 1px --row-divider
+   between them, a 1px true-black outer ring on the stack. The rows are real
+   <button>s, so focus and Enter come for free. */
+.email-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  overflow: hidden;
+}
+
+.email-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  /* >=44px tap target: 12+12 padding around a two-line block clears it with
+     room to spare, and min-height states the floor so a one-line subject
+     cannot shrink the row under it. */
+  min-height: 56px;
+  padding: 12px 10px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--row-a);
+  border: none;
+  border-bottom: 1px solid var(--row-divider);
+  cursor: pointer;
+  transition: background .08s linear, transform .04s linear;
+}
+.email-row:last-child { border-bottom: none; }
+.email-row:nth-child(even) { background: var(--row-b); }
+.email-row:active { transform: translateY(1px); background: var(--panel-hi); }
+.email-row:focus-visible {
+  outline: var(--bw) solid var(--acc-cyan);
+  outline-offset: -3px;
+}
+
+/* SETTLED. The whole row drops to the recessed value and the ink dims
+   (--ink-dim measures 8.5:1 on the --panel-lo family, well over the 4.5:1
+   floor) — read as filed away, never as unreadable. */
+.email-row--settled,
+.email-row--settled:nth-child(even) { background: var(--panel-lo); }
+.email-row--settled .email-row__from,
+.email-row--settled .email-row__subject { color: var(--ink-dim); }
+
+/* The unread dot. A shape, not a glyph — --acc-cyan is this world's
+   attention colour and it is the only cyan on the row. Read state also
+   reaches assistive tech through the row's aria-label, so colour is never
+   the sole carrier. */
+.email-row__dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.email-row--unread .email-row__dot {
+  background: var(--acc-cyan);
+  border-color: var(--pixel-black);
+}
+
+.email-row__main { flex: 1 1 auto; min-width: 0; }
+.email-row__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.email-row__from {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .7px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.email-row__day {
+  flex: 0 0 auto;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .4px;
+  color: var(--ink-dim);
+}
+.email-row__subject {
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  letter-spacing: .2px;
+  color: var(--ink);
+  /* Two lines max: subjects are authored sentences and a row that grows to
+     fit one of them would break the list's rhythm. The full text is one tap
+     away in the detail, so nothing is lost. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.email-row--unread .email-row__subject { font-weight: 700; color: var(--ink-head); }
+
+.email-row__tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+
+.email-row__chev {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: var(--border-hi);
+  display: flex;
+}
+.email-row__chev svg { width: 100%; height: 100%; }
+
+/* ---- badges ----------------------------------------------------------
+   All five are a bounded, outlined chip carrying DARK text on a saturated
+   fill — the V16 brightness strategy, and the reason none of them needs a
+   glow. --ink-on-fill on --gold/--danger/--cash all measure far above the
+   4.5:1 floor; the dead chip uses the stated --dead-ink on --dead-fill
+   (7.35:1) rather than a filter, which is what wrecked contrast last time. */
+.email-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  background: var(--panel-hi);
+  color: var(--ink);
+}
+.email-badge__icon { width: 10px; height: 10px; display: flex; }
+.email-badge__icon svg { width: 100%; height: 100%; }
+
+/* TIME. The loudest thing in a live row — this pressure is the feature. */
+.email-badge--time { background: var(--gold); color: var(--ink-on-fill); }
+.email-badge--urgent { background: var(--danger); color: var(--ink-on-fill); }
+
+.email-badge--won { background: var(--cash); color: var(--ink-on-fill); }
+.email-badge--lost { background: var(--danger); color: var(--ink-on-fill); }
+.email-badge--accepted { background: var(--elo); color: var(--ink-on-fill); }
+/* CLOSED — declined or run out. THE DEAD KEY's stated palette (V20 §D), so a
+   settled-and-gone chip reads as colour REMOVED rather than colour dimmed. */
+.email-badge--expired {
+  background: var(--dead-fill);
+  color: var(--dead-ink);
+  border-color: var(--pixel-black);
+}
+.email-badge--scout { background: var(--subs); color: var(--ink-on-fill); }
+
+/* ---- empty state ------------------------------------------------------ */
+.email-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 26px 18px 28px;
+  text-align: center;
+  background: var(--panel-lo);
+}
+.email-empty__icon { width: 34px; height: 34px; color: var(--border-hi); display: flex; }
+.email-empty__icon svg { width: 100%; height: 100%; }
+.email-empty__title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.email-empty__text {
+  font-size: 8.5px;
+  line-height: 1.5;
+  letter-spacing: .3px;
+  color: var(--ink-dim);
+  max-width: 30ch;
+}
+
+/* ---- detail view ------------------------------------------------------ */
+.email-detail__bar { display: flex; align-items: center; gap: 10px; }
+
+/* 44x44, stated. The icon inside is 18px; the hit box is the button. */
+.email-back {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel-hi);
+  border: 1px solid var(--pixel-black);
+  border-radius: var(--radius-pixel);
+  box-shadow: inset 0 2px 0 var(--bevel-hi), inset 0 -2px 0 var(--bevel-lo);
+  cursor: pointer;
+}
+.email-back:active { transform: translateY(1px); box-shadow: inset 0 2px 0 var(--bevel-lo); }
+.email-back:focus-visible { outline: var(--bw) solid var(--acc-cyan); outline-offset: 2px; }
+.email-back__icon { width: 18px; height: 18px; display: flex; }
+.email-back__icon svg { width: 100%; height: 100%; }
+
+.email-detail__who { min-width: 0; }
+.email-detail__from {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.email-detail__day {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  color: var(--ink-dim);
+}
+
+.email-letter { padding: 11px 12px 13px; }
+.email-letter__subject {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+}
+.email-letter__status { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+/* THE ONE PLACE IN THE GAME THAT IS NOT SHOUTING. The body is authored prose
+   from a scout or an org, so it keeps its sentence case and gets real
+   line-height — an uppercase wall would make the one piece of writing in the
+   feature unreadable, and the surrounding chrome already carries the voice. */
+.email-letter__body {
+  margin-top: 9px;
+  font-size: 11px;
+  line-height: 1.6;
+  letter-spacing: .2px;
+  color: var(--ink);
+  text-transform: none;
+}
+
+/* ---- stakes ----------------------------------------------------------- */
+.email-reward { padding: 9px 12px 11px; }
+.email-reward__head {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--ink-head);
+  text-shadow: var(--text-outline);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--pixel-black);
+}
+.email-reward__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--row-divider);
+}
+.email-reward__row:last-of-type { border-bottom: none; }
+.email-reward__label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .8px;
+  color: var(--ink-dim);
+}
+.email-reward__val {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  text-align: right;
+  color: var(--ink);
+  text-shadow: var(--text-outline);
+}
+.email-reward__val--cash { color: var(--cash); }
+.email-reward__val--good { color: var(--acc-green); }
+.email-reward__val--bad { color: var(--danger); }
+.email-reward__note {
+  margin-top: 7px;
+  font-size: 8px;
+  line-height: 1.5;
+  letter-spacing: .3px;
+  color: var(--ink-dim);
+}
+
+/* ---- actions ---------------------------------------------------------- */
+.email-actions { display: flex; gap: 8px; }
+.email-actions__btn {
+  flex: 1 1 0;
+  min-height: 48px;
+  font-size: 11px;
+}
+.email-actions__btn--wide { flex: 1 1 100%; }
+.email-actions__note {
+  font-size: 8px;
+  line-height: 1.5;
+  letter-spacing: .3px;
+  color: var(--ink-dim);
+  padding: 0 2px 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .email-row { transition: none; }
+}

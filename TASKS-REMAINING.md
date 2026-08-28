@@ -270,10 +270,57 @@ starting them.
 
 ---
 
-## V23 — FIXING ACT ONE (owner-directed, 2026-08-27) — **SPECCED, NOT BUILT**
+## V23 — FIXING ACT ONE (owner-directed, 2026-08-27) — **BUILT AND VERIFIED**
 
 > Full contract: **`SPEC-V23-QUESTS.md`** — ownership map, catalog, save schema,
-> the CLUTCH minigame and the test plan. What follows is the why.
+> the CLUTCH minigame and the test plan. What follows is the why, then what
+> shipped.
+>
+> Regression cover is **`test-v23-quests.js` (28 checks)** — add to that file
+> rather than starting a new one. It was written by the lead AGAINST THE SPEC
+> before any package's code was read, which is deliberate: a suite written
+> afterwards tends to assert whatever the implementation happens to do.
+
+### What shipped
+
+| Package | Files | State |
+|---|---|---|
+| Q | `js/data.js`, `js/state.js` | catalog, cadence, scout stages, save schema, the whole `State` API |
+| C | `js/clutch.js` | THE CLUTCH — AWP quickscope on Dust 2 B site |
+| E | `js/email.js`, `css/email.css` | the inbox: list + detail, scout strip |
+| P | `js/phone.js` | the EMAIL tile, leading `APP_ORDER` |
+
+**Verified end to end as a player**, not from agent reports: clicking a row
+opens the detail, ACCEPT moves **neither cash nor ELO**, the CLUTCH opens with
+that tier's numbers, and a win pays exactly the tier's purse and `winElo`
+(measured: +$900 / +230 on `region`), settles the email to `won`, and re-renders
+the row as settled. Measured on the real screen at 420x860: back control 66x44
+(the old 61x31 floor breach is fixed on this screen's own selector), rows
+398x73, text contrast 7.19–15.33:1.
+
+### Things that will bite you here
+
+- **`js/email.js` and `js/matchgames.js` disagree ON PURPOSE.** matchgames
+  pre-rolls its result before the overlay opens, because a career match must
+  not hinge on a minigame. THE CLUTCH is the opposite: it *is* the decider,
+  because a quest is opt-in side content off the critical path. Both files
+  carry a comment saying so. Someone will eventually notice and try to make
+  them match; whichever way they go, one of the two features breaks. A suite
+  check now asserts `resolveInvite` appears *after* `Clutch.run` in
+  `js/email.js`.
+- **A scout-fired email is identified by its `scoutStage` stamp, NOT by
+  `kind`.** Stage 3 is a playable trial and so carries `kind:'invite'`, which
+  is otherwise byte-identical to a cadence invite. Without the stamp, "did
+  stage N fire" is unanswerable from the save.
+- **The inbox caps at 30 entries.** A long simulated run will silently evict
+  the email you are testing — this cost the lead a wrong conclusion about
+  Package Q before the cap became the obvious suspect. Cross the scout bands
+  in as few days as possible when testing them.
+- **`Clutch.__win()` / `__fail()` drive the real `endMatch()`.** They were
+  added after the fact because SPEC §5.7 listed only `__probe` and `__force`,
+  which left the outcome path reachable only by playing the LAN by hand. Do not
+  "simplify" them into calling the done callback directly — a seam that
+  bypasses the code under test proves nothing.
 
 The owner's report: *"i dont like the progression rn, since you have to grind
 till 2.1k elo and it gets boring quick."*

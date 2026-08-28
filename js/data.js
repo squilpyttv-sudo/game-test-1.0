@@ -1679,6 +1679,63 @@
     }
   };
 
+  /* ---- SPEC-V23 §4.1: quest invites (the email app's side-quest catalog) ---
+     Rolled at END DAY (js/state.js's State.rollDailyEmails, §4.2) into the
+     new emails inbox. Purse/ELO numbers are the owner's tuning — verbatim
+     from the spec, do not re-derive them. Where the purse comes from:
+     starter shop items run $30-220, the pro band $600-3,000, the elite OLED
+     $20,000, and the Regional Qualifier pool is $5,000
+     (Data.tournamentTiers[3]) — a LAN buys a pro-band item over two or three
+     wins, and every purse stays below the tournament ladder on purpose.
+     ELO is 100-300 by tier (owner-set 2026-08-27, replacing an earlier
+     30-90 draft that was pure flavour) — at this band a quest is worth 6-17
+     solo matches and a real reward. `loseElo` sits at roughly a third of
+     `winElo` so a botched LAN genuinely costs you (quests cost no energy —
+     SPEC-V23 §4.3 — so the ELO penalty is the ONLY cost of failure).
+     `enemies` and `exposeMs` feed straight into Game.Clutch.run() (§5.7) —
+     this catalog is their single source, never re-specified in js/clutch.js. */
+  Data.questInvites = [
+    { id: 'cafe',   name: 'INTERNET CAFÉ 5v5',  eloMin: 0,    purse: 150,  winElo: 100, loseElo: -30,  loseCash: 0,   enemies: 2, exposeMs: 900 },
+    { id: 'lan',    name: 'LOCAL LAN',           eloMin: 600,  purse: 400,  winElo: 160, loseElo: -50,  loseCash: 40,  enemies: 3, exposeMs: 780 },
+    { id: 'region', name: 'REGIONAL SHOWMATCH',  eloMin: 1200, purse: 900,  winElo: 230, loseElo: -75,  loseCash: 100, enemies: 4, exposeMs: 650 },
+    { id: 'invit',  name: 'INVITATIONAL',        eloMin: 1800, purse: 2000, winElo: 300, loseElo: -100, loseCash: 250, enemies: 5, exposeMs: 520 }
+  ];
+  Data.questInviteIntervalDays = [3, 5];   // inclusive roll at END DAY (§4.2)
+  Data.questInviteExpiryDays   = 3;
+  Data.questInviteMaxOpen      = 2;        // never more than 2 live invites at once
+
+  /* ---- SPEC-V23 §6: scout interest — the wall made visible ------------------
+     Four stages, staged on ELO, each firing exactly ONE email the first time
+     it is crossed (latched — js/state.js's State.rollDailyEmails writes
+     d.scoutStage and never re-fires a stage once passed). `{team}` in
+     subject/body is filled in at fire time from a real team drawn off
+     Data.teams (js/state.js) — this file authors no second name list
+     (HANDOFF-V2 §5.4). Stage 4 is a notification ONLY: it points the player
+     at the offers inbox that State.offers() already produces — it must never
+     reimplement an offer (HANDOFF-V2 §5.4, spec §6). */
+  Data.scoutStages = [
+    {
+      stage: 1, elo: 800,
+      subject: 'Somebody is taking notes',
+      body: 'One of our analysts has had your matches on a watchlist for a few weeks now. Nothing official — just keep playing.'
+    },
+    {
+      stage: 2, elo: 1200,
+      subject: 'We’re watching your matches',
+      body: '{team} has you flagged. Their scouting desk pulls VOD on players trending the way you are. No offer yet — but the file is open.'
+    },
+    {
+      stage: 3, elo: 1700,
+      subject: 'A trial, if you want it',
+      body: '{team} wants to see you under real pressure before anything gets official. Take the trial LAN below — beat it and you’re on their radar for real.'
+    },
+    {
+      stage: 4, elo: 2100,
+      subject: 'Check your offers',
+      body: 'You’re on the board now. Organisations can make it official — open CAREER and see who’s calling.'
+    }
+  ];
+
   window.Game = window.Game || {};
   window.Game.Data = Data;
 })();
