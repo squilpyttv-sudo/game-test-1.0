@@ -35,13 +35,35 @@
         held off-screen instead), and the thing that stops spam-tapping.
         There is deliberately no separate miss penalty layered on top of it.
 
-   ART — first-person Dust 2 B site from the defender's eye, five peek
-   angles anchored to real cover (tunnels, B doors, car, back platform,
-   hole), the AWP viewmodel bottom-right as js/matchgames.js's spray game
-   holds its AK. All flat rects on canvas, no image assets (HANDOFF-V2 §2),
-   no emoji or glyph icons. Colour literals are correct here for the same
-   reason they are in js/iso.js and js/matchgames.js: canvas cannot read CSS
-   variables.
+   ART — MIRAGE MID, seen from inside the window (owner's reference shot,
+   V23a). The whole view is framed by that window: timber beams overhead,
+   brick-and-plaster jambs down both sides, a worn sill along the bottom.
+   That frame is doing structural work, not decoration — it is what buys the
+   scene a real foreground, and with a receding ground plane behind it the
+   art finally has foreground / midground / background instead of the flat
+   bands the first pass shipped. Depth here comes from OVERLAP, SIZE FALLOFF
+   and a cooler, lighter distance, never from extra detail in one plane:
+   at 420px wide, detail is noise and silhouette is everything.
+
+   The five peek angles are PLACES IN THAT ARCHITECTURE, not rectangles
+   floated on top of it — past the blue house's corner, out of the raised
+   archway, behind the barrel stack, over the low dividing wall, out of the
+   arched A doorway. Two of them (SHORT WALL, BARRELS) are deliberately
+   drawn in two passes with the enemy sandwiched between, so the silhouette
+   is genuinely occluded by the cover it is peeking from rather than pasted
+   over it. See drawSceneBack() / drawSceneFront().
+
+   The AWP viewmodel sits bottom-right, as js/matchgames.js's spray game
+   holds its AK. All flat rects and arcs on canvas, no image assets
+   (HANDOFF-V2 §2), no emoji or glyph icons. Colour literals are correct
+   here for the same reason they are in js/iso.js and js/matchgames.js:
+   canvas cannot read CSS variables.
+
+   NOTHING ABOUT THE GAME CHANGED WITH THE ART. The flick band, the bolt
+   cycle, best-of-3, the death read and the whole public API are the same
+   values and the same code they were on Dust 2. This was an environment
+   swap and a re-siting of five angles, and if a tuning constant ever moves
+   in a commit that also moves art, that commit is wrong.
 
    TIMING — wall-clock (Date.now()) throughout, never frame-accumulated (the
    dt-accumulator trap: a dropped frame rate would stretch the tell out of
@@ -99,23 +121,62 @@
      hitbox. Nothing downstream ever re-derives a second copy of "where this
      angle is".
 
-     `cover` is the wall/architecture tone painted around each gap; the gap
-     itself is always GAP_SHADOW — a doorway or window seen from outside is
-     the darkest thing on the site regardless of what the wall around it is
-     made of, which is what keeps the contrast reliable across five very
-     different cover materials (stone, wood, concrete). Luminance is the
-     standard NTSC luma (0.299R + 0.587G + 0.114B, 0-255 scale); the gap sits
-     at ~19.9 and every cover tone below is measured and reported in the
-     verification pass — see the report at the end of this session, and
-     test-v23-quests.js item 13. */
+     `cover` is the material the architecture puts IMMEDIATELY BESIDE each
+     gap — the teal render of the blue house, the cream of the back wall, a
+     barrel's rusted steel, the sandstone of the low wall, the white plaster
+     of the A wall. The gap itself is always GAP_SHADOW, because a doorway or
+     a shaded recess read from out in the sun is the darkest thing in the
+     scene no matter what surrounds it. That is the whole reason this holds
+     across five materials as different as painted render, fired plaster and
+     rusted steel: we are not contrasting a colour against a colour, we are
+     contrasting lit against unlit.
+
+     Luminance below is Rec.709 relative luma (0.2126R + 0.7152G + 0.0722B on
+     the 0-255 scale). GAP_SHADOW sits at 19.6; the smallest gap in the set is
+     BLUE HOUSE at 78.0 and the largest is A DOORWAY at 200.9. Every pair is
+     re-measured in the verification pass rather than taken on trust — see
+     HANDOFF-V2 §5.9, comments lie and measurements do not. */
   var GAP_SHADOW = '#171310';
   var ANGLE_DEFS = [
-    { id: 'tunnels',  label: 'TUNNELS',   gx: 0.035, gy: 0.300, gw: 0.165, gh: 0.300, cover: '#7c6b4a' },
-    { id: 'bdoors',   label: 'B DOORS',   gx: 0.290, gy: 0.260, gw: 0.190, gh: 0.460, cover: '#6b4a2e' },
-    { id: 'car',      label: 'CAR',       gx: 0.560, gy: 0.400, gw: 0.190, gh: 0.300, cover: '#7a7d78' },
-    { id: 'backplat', label: 'BACK PLAT', gx: 0.790, gy: 0.160, gw: 0.180, gh: 0.420, cover: '#8a8f86' },
-    { id: 'hole',     label: 'HOLE',      gx: 0.030, gy: 0.660, gw: 0.130, gh: 0.120, cover: '#8f7a52' }
+    // Past the blue house's right-hand corner, in the shadow beside its
+    // green door. The one saturated thing in the scene, so the darkest gap
+    // in the set is also the easiest to find.
+    { id: 'blue',      label: 'BLUE HOUSE', gx: 0.200, gy: 0.420, gw: 0.120, gh: 0.240, cover: '#2E6E7E' },
+    // The raised archway in the cream back wall, under the palms. Furthest
+    // from the eye, so it is the smallest rect and its silhouette scales
+    // down with it (drawEnemy sizes off the rect, not a constant).
+    { id: 'arch',      label: 'ARCHWAY',    gx: 0.395, gy: 0.270, gw: 0.115, gh: 0.145, cover: '#D9C79C' },
+    // The slot between the two barrel stacks on the open ground. Drawn in
+    // two passes so the front row of barrels cuts the legs off.
+    { id: 'barrels',   label: 'BARRELS',    gx: 0.530, gy: 0.440, gw: 0.120, gh: 0.170, cover: '#B0703A' },
+    // Behind the low dividing wall that splits the space lengthwise. The
+    // nearest angle, so the biggest rect — and the most occluded one.
+    { id: 'shortwall', label: 'SHORT WALL', gx: 0.345, gy: 0.560, gw: 0.180, gh: 0.150, cover: '#C4AC7C' },
+    // Out of the arched doorway under the red painted A, bench at its foot.
+    { id: 'adoor',     label: 'A DOORWAY',  gx: 0.735, gy: 0.455, gw: 0.135, gh: 0.260, cover: '#E4DCCB' }
   ];
+
+  /* The five are STAGGERED IN DEPTH, not laid out in a row, and that is a
+     hard requirement rather than a composition preference. Five angles side
+     by side will not fit across a 332px opening once each one is given cover
+     wide enough to be measurably lighter than it. Staggering buys the space:
+     the archway sits high and far, the barrels and the A doorway at mid
+     height, the low wall lowest and nearest. Two consequences worth knowing
+     before moving any number here — the first pass got both wrong and the
+     measurement pass, not the eye, is what caught them:
+       - Architecture drawn for one angle can drift across ANOTHER angle's
+         gap. A three-barrel stack reached up into the archway and put rust
+         where a silhouette had to be.
+       - No two gap rects may intersect, or a tap resolves against whichever
+         happens to be live rather than the one under the finger.
+     Both are asserted arithmetically in the verification pass. */
+
+  /* Where the window's opening is, as fractions of the canvas. The frame is
+     drawn over these edges last (drawWindowFrame), and every gap above lives
+     strictly inside them — a peek angle hidden behind a timber beam is an
+     unwinnable round, so this relationship is asserted in the verification
+     pass rather than eyeballed. */
+  var OPEN_X0 = 0.105, OPEN_X1 = 0.895, OPEN_Y0 = 0.135, OPEN_Y1 = 0.865;
 
   function pickAngle(prevIdx) {
     // No immediate repeat — the same rule js/matchgames.js's pickGame() and
@@ -130,6 +191,15 @@
   function angleRectPx(def, w, h) {
     return { x: def.gx * w, y: def.gy * h, w: def.gw * w, h: def.gh * h };
   }
+  /* The art reads its gap positions back OUT of ANGLE_DEFS by id, so a piece
+     of architecture and the hitbox it belongs to can never drift apart. This
+     is the reason drawSceneBack() has no coordinate literals for any of the
+     five openings — HANDOFF-V2 §5.4, the second copy is the bug. */
+  function defById(id) {
+    for (var i = 0; i < ANGLE_DEFS.length; i++) if (ANGLE_DEFS[i].id === id) return ANGLE_DEFS[i];
+    return ANGLE_DEFS[0];
+  }
+  function gapPx(id, w, h) { return angleRectPx(defById(id), w, h); }
   function pointInRect(px2, py2, r) {
     return px2 >= r.x && px2 <= r.x + r.w && py2 >= r.y && py2 <= r.y + r.h;
   }
@@ -152,7 +222,7 @@
     root.className = 'mg-match';
     root.id = 'clutch-overlay';
     root.innerHTML =
-      '<div class="mg-match__label" id="clutch-label">THE CLUTCH — B SITE</div>' +
+      '<div class="mg-match__label" id="clutch-label">THE CLUTCH — MIRAGE MID</div>' +
       '<canvas class="mg-match__canvas" id="clutch-canvas"></canvas>' +
       '<div class="mg-match__banner" id="clutch-banner"></div>';
     var host = document.getElementById('app') || document.body;
@@ -372,54 +442,461 @@
   }
 
   /* ======================================================================
-     DRAW — the defender's-eye B site.
+     DRAW — MIRAGE MID, through the window.
+
+     Painted back-to-front in two calls with the enemy sandwiched between
+     them, because occlusion is the cheapest depth cue there is and the only
+     one that makes a silhouette read as "peeking" instead of "placed":
+
+       drawSceneBack()   sky, minaret, back wall + archway, blue house,
+                         A wall, the paving, and the FAR half of the low
+                         wall and the barrel stacks — every gap is punched
+                         here, so the enemy always has something dark behind.
+       drawEnemy()       the silhouette, inside the active gap only.
+       drawSceneFront()  the NEAR half of the low wall, the front barrel row,
+                         the bench, then the window frame over everything.
+
+     Sunlight comes from the upper left throughout — every lit edge is a top
+     or left edge and every shadow falls right and down. One light direction,
+     applied without exception, is what stops a scene drawn out of flat rects
+     from looking like a collage of unrelated rects.
      ====================================================================== */
-  function drawSite(c, w, h) {
-    var i, def, r, cx, cy;
 
-    // ---- ambient wall the covers sit on, and the sunlit floor ----
-    px(c, 0, 0, w, h, '#5c4a2e');
-    var floorTop = h * 0.80;
-    px(c, 0, floorTop, w, h - floorTop, '#b79a68');
-    px(c, 0, floorTop, w, 4, '#8a7345');
-    for (var fy = floorTop + 18; fy < h; fy += 30) px(c, 0, fy, w, 2, '#a3875c');
+  // The one palette. Named by material, not by role, so a colour is chosen
+  // by asking what a thing is MADE of rather than where it happens to sit.
+  var SKY_TOP   = '#5F8CAB', SKY_MID = '#8FB0C4', SKY_HAZE = '#C4D2D4';
+  var CREAM     = '#D9C79C', CREAM_HI = '#EADCB8', CREAM_LO = '#AE9668';
+  var TEAL      = '#2E6E7E', TEAL_HI = '#41909F', TEAL_LO = '#1D4C58';
+  var PLASTER   = '#E4DCCB', PLASTER_HI = '#F3EEE2', PLASTER_LO = '#B6AB95';
+  var SAND      = '#C4AC7C', SAND_HI = '#DCC79A';
+  var STONE     = '#B9A278', STONE_HI = '#CEB88E', STONE_LO = '#94805C';
+  var RUST      = '#B0703A', RUST_HI = '#CE8E52', RUST_LO = '#7C4C24';
+  var TIMBER    = '#6B5334', TIMBER_HI = '#8F7148', TIMBER_LO = '#3E2F1D';
+  var BRICKED   = '#A98A64', BRICK = '#8E6748';
+  var PALM      = '#4E6B33', PALM_HI = '#6C8C46';
+  var RED_A     = '#B23A2E';
+  var IRON      = '#3B3A36';
 
-    // the painted B, high on the back wall between B doors and Car — clear
-    // of every gap rect (all start at gy >= 0.16) so it never eats into the
-    // one thing that has to stay dark for the contrast rule.
-    px(c, w * 0.30, h * 0.02, w * 0.40, h * 0.11, '#3a2e1c');
-    pixelText(c, 'B', w * 0.50, h * 0.075, Math.round(h * 0.075), '#c23b2e', 'center');
+  function drawSceneBack(c, w, h) {
+    var y0 = h * OPEN_Y0, y1 = h * OPEN_Y1;
+    var horizon = h * 0.545;          // where the paving meets the far wall
 
-    // ---- each angle: cover, then its gap punched dark into the cover ----
-    for (i = 0; i < ANGLE_DEFS.length; i++) {
-      def = ANGLE_DEFS[i];
-      r = angleRectPx(def, w, h);
-      var m = Math.max(10, w * 0.025);           // cover margin around the gap
-      px(c, r.x - m, r.y - m, r.w + m * 2, r.h + m * 2, def.cover);
-      px(c, r.x - m, r.y - m, r.w + m * 2, 4, 'rgba(255,255,255,0.14)');   // lit top edge
-      px(c, r.x, r.y, r.w, r.h, GAP_SHADOW);
-      // a 3px frame so the gap reads as an opening, not a hole punched out
-      px(c, r.x - 3, r.y, 3, r.h, '#2e2416');
-      px(c, r.x + r.w, r.y, 3, r.h, '#4a3a24');
+    // ---- sky: three bands, coolest and darkest at the top, hazy at the
+    // horizon. Distance reading lighter and cooler than the foreground is
+    // aerial perspective, and it is doing more work here than any detail.
+    px(c, 0, 0, w, horizon, SKY_MID);
+    px(c, 0, 0, w, h * 0.26, SKY_TOP);
+    px(c, 0, h * 0.26, w, h * 0.06, '#7AA0B8');
+    px(c, 0, h * 0.44, w, horizon - h * 0.44, SKY_HAZE);
+
+    // ---- minaret, rising behind and left of the archway. Drawn in haze-
+    // shifted cream so it sits BEHIND the back wall without an outline.
+    var mx = w * 0.335, mw = w * 0.058;
+    px(c, mx, h * 0.150, mw, h * 0.40, '#CFC0A0');
+    px(c, mx, h * 0.150, mw * 0.42, h * 0.40, '#E0D3B4');      // sunlit face
+    px(c, mx - w * 0.014, h * 0.196, mw + w * 0.028, h * 0.014, '#BFB093');  // gallery
+    px(c, mx + mw * 0.20, h * 0.118, mw * 0.60, h * 0.034, '#D8CBAC');       // cap
+    px(c, mx + mw * 0.42, h * 0.100, mw * 0.16, h * 0.020, '#BFB093');       // finial
+
+    // ---- power lines. Two sags across the sky, 2px, no more: they are a
+    // silhouette cue for "this is a street", not a subject.
+    c.save();
+    c.strokeStyle = 'rgba(38,44,50,0.55)'; c.lineWidth = 2;
+    for (var L = 0; L < 2; L++) {
+      c.beginPath();
+      c.moveTo(0, h * (0.205 + L * 0.045));
+      c.quadraticCurveTo(w * 0.5, h * (0.245 + L * 0.045), w, h * (0.190 + L * 0.045));
+      c.stroke();
+    }
+    c.restore();
+
+    // ---- the cream back wall, and the raised archway punched into it ----
+    px(c, 0, h * 0.255, w, horizon - h * 0.255, CREAM);
+    px(c, 0, h * 0.255, w, 5, CREAM_HI);                       // sun on the coping
+    px(c, 0, horizon - h * 0.030, w, h * 0.030, CREAM_LO);      // wall foot in shade
+    drawArchway(c, w, h);
+
+    // ---- palm fronds over the wall, just left of the arch crown. Six
+    // tapered blades off one point; a palm is a silhouette, not a texture.
+    drawPalm(c, w * 0.545, h * 0.268, w * 0.115);
+    drawPalm(c, w * 0.375, h * 0.276, w * 0.088);
+
+    // ---- the paving. Bands deepen toward the viewer and a handful of
+    // joints converge on the arch, which is the only perspective cue the
+    // scene needs and the reason the ground reads as receding rather than
+    // as a wall lying down.
+    drawPaving(c, w, h, horizon);
+
+    // ---- the blue house, left, and its corner recess (BLUE HOUSE) ----
+    drawBlueHouse(c, w, h);
+
+    // ---- the A wall, right, and its arched doorway (A DOORWAY) ----
+    drawAWall(c, w, h);
+
+    // ---- far halves of the two two-pass angles ----
+    drawLowWallBack(c, w, h);
+    drawBarrelsBack(c, w, h);
+
+    // A whisper of warm bounce along the very bottom of the opening, so the
+    // paving nearest the sill is the warmest thing in the scene and the eye
+    // has somewhere to start.
+    px(c, 0, y1 - h * 0.05, w, h * 0.05, 'rgba(196,150,80,0.13)');
+    if (y0 > 0) { /* the frame covers above y0; nothing to draw there */ }
+  }
+
+  function drawSceneFront(c, w, h) {
+    drawLowWallFront(c, w, h);
+    drawBarrelsFront(c, w, h);
+    drawBench(c, w, h);
+    drawWindowFrame(c, w, h);
+  }
+
+  /* -- ARCHWAY: a raised gateway in the cream wall. The gap rect IS the
+     opening; the arch is built around it from the rect, never beside it. */
+  function drawArchway(c, w, h) {
+    var r = gapPx('arch', w, h);
+    var pad = w * 0.040;
+    // the raised block the gateway sits in, a shade lighter than the wall
+    px(c, r.x - pad, r.y - pad * 1.5, r.w + pad * 2, r.h + pad * 1.5, CREAM_HI);
+    px(c, r.x - pad, r.y - pad * 1.5, r.w + pad * 2, 4, '#F5E9C8');
+    px(c, r.x - pad * 1.4, r.y - pad * 1.5, r.w + pad * 2.8, h * 0.012, '#C9B78C'); // lintel band
+    // the opening: square below, semicircular crown above
+    var cxA = r.x + r.w / 2, rad = r.w / 2;
+    c.fillStyle = GAP_SHADOW;
+    c.beginPath();
+    c.moveTo(r.x, r.y + r.h);
+    c.lineTo(r.x, r.y + rad);
+    c.arc(cxA, r.y + rad, rad, Math.PI, 0);
+    c.lineTo(r.x + r.w, r.y + r.h);
+    c.closePath();
+    c.fill();
+    // reveal: the left jamb catches sun, the right one does not
+    px(c, r.x - 3, r.y + rad, 3, r.h - rad, CREAM_HI);
+    px(c, r.x + r.w, r.y + rad, 3, r.h - rad, CREAM_LO);
+    // three steps up to it — this is the "raised" in raised gateway
+    for (var s = 0; s < 3; s++) {
+      px(c, r.x - pad - s * 5, r.y + r.h + s * 6, r.w + pad * 2 + s * 10, 6, s % 2 ? CREAM : CREAM_HI);
+      px(c, r.x - pad - s * 5, r.y + r.h + s * 6 + 5, r.w + pad * 2 + s * 10, 2, CREAM_LO);
+    }
+  }
+
+  /* -- BLUE HOUSE: the one saturated mass in a sand-toned scene, so it
+     anchors the composition and the eye returns to it. Green door, iron
+     railing, small balcony; the peek is the shaded corner at its right
+     edge, where the render turns away from the sun. */
+  function drawBlueHouse(c, w, h) {
+    var r = gapPx('blue', w, h);
+    var bx = 0, bw = r.x + r.w + w * 0.008;         // wall ends just past the gap
+    var by = h * 0.205, bh = h * 0.690 - by;
+    px(c, bx, by, bw, bh, TEAL);
+    px(c, bx, by, bw, 6, TEAL_HI);                   // sunlit parapet
+    px(c, bx + bw - 8, by, 8, bh, TEAL_LO);          // the corner turning away
+    px(c, bx, by + bh - h * 0.020, bw, h * 0.020, '#173C46');   // plinth
+    // weathering: two horizontal wash bands, low alpha, no texture noise
+    px(c, bx, by + bh * 0.34, bw, 5, 'rgba(255,255,255,0.08)');
+    px(c, bx, by + bh * 0.62, bw, 4, 'rgba(0,0,0,0.10)');
+
+    // balcony + railing, above the door
+    var balY = by + h * 0.115;
+    px(c, bx + w * 0.020, balY, bw - w * 0.040, h * 0.012, TEAL_LO);
+    px(c, bx + w * 0.020, balY, bw - w * 0.040, 3, TEAL_HI);
+    for (var i = 0; i < 7; i++) {
+      px(c, bx + w * 0.030 + i * (bw - w * 0.062) / 7, balY - h * 0.038, 3, h * 0.038, IRON);
+    }
+    px(c, bx + w * 0.024, balY - h * 0.040, bw - w * 0.048, 3, IRON);
+
+    // Green door, to the LEFT of the peek so the two never fight — and held
+    // far enough off it that the door's own shadowed frame is not what the
+    // silhouette is being read against. Measured: at a 0.014w standoff the
+    // cover beside this gap was the frame at 66.9, not the render at 97.6.
+    var dw = w * 0.062, dh = h * 0.170;
+    var dx = r.x - dw - w * 0.030, dy = r.y + r.h - dh;
+    px(c, dx - 3, dy - 3, dw + 6, dh + 3, TEAL_LO);              // frame
+    px(c, dx, dy, dw, dh, '#3F6B31');
+    px(c, dx, dy, dw * 0.30, dh, '#4F8039');                     // sunlit leaf
+    px(c, dx + dw * 0.62, dy + dh * 0.46, 5, 5, '#C9B25A');      // handle
+
+    // THE PEEK: the shaded recess at the corner. Cover (TEAL) is what sits
+    // immediately left of it and along its top — see ANGLE_DEFS.
+    px(c, r.x, r.y, r.w, r.h, GAP_SHADOW);
+    px(c, r.x - 3, r.y, 3, r.h, TEAL_HI);                        // lit inner jamb
+    px(c, r.x, r.y - 3, r.w, 3, TEAL_LO);                        // soffit above
+    px(c, r.x, r.y + r.h, r.w, 4, '#173C46');                    // ground contact
+  }
+
+  /* -- A WALL: white plaster, the red painted A, an arched doorway. The
+     brightest cover in the set against the darkest gap, which is why this
+     angle is the easiest read of the five and sits opposite the hardest. */
+  function drawAWall(c, w, h) {
+    var r = gapPx('adoor', w, h);
+    var wx = r.x - w * 0.028, ww = w - wx;
+    var wy = h * 0.275, wh = h * 0.745 - wy;
+    px(c, wx, wy, ww, wh, PLASTER);
+    px(c, wx, wy, ww, 6, PLASTER_HI);                            // sun on the top
+    px(c, wx, wy, 7, wh, PLASTER_LO);                            // left return in shade
+    px(c, wx, wy + wh - h * 0.016, ww, h * 0.016, '#9E9280');     // damp course
+    px(c, wx + 8, wy + wh * 0.55, ww - 8, 4, 'rgba(0,0,0,0.07)');
+
+    // the red A, painted high and clear of the doorway rect
+    pixelText(c, 'A', wx + ww * 0.52, wy + h * 0.052, Math.round(h * 0.085), RED_A, 'center');
+
+    // THE PEEK: arched doorway, same construction as the gateway so the two
+    // openings belong to one building language.
+    var cxA = r.x + r.w / 2, rad = r.w / 2;
+    c.fillStyle = GAP_SHADOW;
+    c.beginPath();
+    c.moveTo(r.x, r.y + r.h);
+    c.lineTo(r.x, r.y + rad);
+    c.arc(cxA, r.y + rad, rad, Math.PI, 0);
+    c.lineTo(r.x + r.w, r.y + r.h);
+    c.closePath();
+    c.fill();
+    px(c, r.x - 4, r.y + rad, 4, r.h - rad, PLASTER_HI);
+    px(c, r.x + r.w, r.y + rad, 4, r.h - rad, PLASTER_LO);
+    // a shallow relieving arch above, in the same plaster
+    c.save();
+    c.strokeStyle = PLASTER_LO; c.lineWidth = 5;
+    c.beginPath(); c.arc(cxA, r.y + rad, rad + 7, Math.PI, 0); c.stroke();
+    c.restore();
+  }
+
+  /* -- LOW DIVIDING WALL, far half. Runs away from the viewer, so it is
+     drawn as a trapezoid: taller and wider at the near end. The peek is the
+     shadow pocket beyond it. */
+  function drawLowWallBack(c, w, h) {
+    var r = gapPx('shortwall', w, h);
+    // the sandstone mass the pocket is cut into, extended either side of
+    // the rect so SAND is genuinely the material adjacent to the gap
+    // Kept clear of the BLUE HOUSE gap on the left (2px) — the mass may
+    // extend under the barrels on the right because drawBarrelsBack() runs
+    // after this and re-punches its own gap.
+    var mx = r.x - w * 0.020, mw = r.w + w * 0.020 + w * 0.110;
+    px(c, mx, r.y - h * 0.010, mw, r.h + h * 0.030, SAND);
+    px(c, mx, r.y - h * 0.010, mw, 5, SAND_HI);
+    for (var cy = r.y + h * 0.030; cy < r.y + r.h; cy += h * 0.038) {
+      px(c, mx, cy, mw, 2, 'rgba(0,0,0,0.10)');                  // coursing
+    }
+    px(c, r.x, r.y, r.w, r.h, GAP_SHADOW);                       // THE PEEK
+    px(c, r.x - 3, r.y, 3, r.h, SAND_HI);
+    px(c, r.x + r.w, r.y, 3, r.h, '#9C875D');
+  }
+
+  function drawLowWallFront(c, w, h) {
+    var r = gapPx('shortwall', w, h);
+    // The cap lands at 0.62 of the gap's height, which puts it across the
+    // silhouette's chest: head, helmet and shoulders clear the wall and the
+    // rest does not. That is the shape of a real head peek, and it is the
+    // reason this angle needed two passes at all.
+    var capY = r.y + r.h * 0.62;
+    var nearX0 = r.x - w * 0.145, nearX1 = r.x + r.w + w * 0.145;
+    var farX0  = r.x - w * 0.065, farX1  = r.x + r.w + w * 0.065;
+    var botY   = h * 0.790;
+    c.fillStyle = SAND;
+    c.beginPath();
+    c.moveTo(farX0, capY); c.lineTo(farX1, capY);
+    c.lineTo(nearX1, botY); c.lineTo(nearX0, botY);
+    c.closePath(); c.fill();
+    // the cap: the top plane catches the sun, so it is the lightest band and
+    // the line the silhouette breaks over
+    c.fillStyle = SAND_HI;
+    c.beginPath();
+    c.moveTo(farX0, capY); c.lineTo(farX1, capY);
+    c.lineTo(farX1 + (nearX1 - farX1) * 0.16, capY + 7);
+    c.lineTo(farX0 + (nearX0 - farX0) * 0.16, capY + 7);
+    c.closePath(); c.fill();
+    px(c, nearX0, botY - 5, nearX1 - nearX0, 5, '#8E7A52');      // wall foot
+    // cast shadow on the paving, falling right and down like every other
+    c.fillStyle = 'rgba(60,44,22,0.22)';
+    c.beginPath();
+    c.moveTo(nearX1, botY); c.lineTo(nearX1 + w * 0.075, botY);
+    c.lineTo(farX1 + w * 0.045, capY + 7); c.lineTo(farX1, capY + 7);
+    c.closePath(); c.fill();
+  }
+
+  /* -- BARREL STACKS. Two stacks flanking the peek slot, plus a front row
+     drawn after the enemy. Barrels are cylinders: a body, a lighter left
+     third for the sun, two hoops. */
+  function drawBarrelsBack(c, w, h) {
+    var r = gapPx('barrels', w, h);
+    // Both stacks ABUT the slot rather than standing off it, so the steel is
+    // genuinely the material beside the gap and the measurement is reading
+    // what the eye reads. Height is capped at three: a fourth reaches into
+    // the ARCHWAY's gap, which is how this went wrong the first time.
+    var bw = w * 0.070, bh = h * 0.075;
+    var baseY = r.y + r.h + h * 0.030;
+    var i;
+    for (i = 0; i < 3; i++) {                                    // left stack
+      drawBarrel(c, r.x - bw / 2, baseY - (i + 1) * bh, bw, bh,
+                 i === 1 ? '#3E7590' : RUST, i === 1 ? '#5A97B2' : RUST_HI, i === 1 ? '#26526A' : RUST_LO);
+    }
+    for (i = 0; i < 3; i++) {                                    // right stack
+      drawBarrel(c, r.x + r.w + bw / 2, baseY - (i + 1) * bh, bw, bh,
+                 i === 2 ? '#3E7590' : RUST, i === 2 ? '#5A97B2' : RUST_HI, i === 2 ? '#26526A' : RUST_LO);
+    }
+    px(c, r.x, r.y, r.w, r.h, GAP_SHADOW);                       // THE PEEK slot
+  }
+
+  function drawBarrelsFront(c, w, h) {
+    var r = gapPx('barrels', w, h);
+    var bw = w * 0.090, bh = h * 0.095;
+    var baseY = r.y + r.h + h * 0.045;
+    // Nearer, so bigger — the same barrels one row closer. Their tops land
+    // just below the silhouette's waist and cut its legs off.
+    drawBarrel(c, r.x + r.w * 0.28, baseY - bh, bw, bh, RUST, RUST_HI, RUST_LO);
+    drawBarrel(c, r.x + r.w * 0.88, baseY - bh * 0.90, bw, bh, '#7C7A66', '#9C9A84', '#54523F');
+    drawCrate(c, r.x + r.w * 0.14, baseY - h * 0.006, w * 0.070, h * 0.050);
+  }
+
+  // x,y is the barrel's CENTRE-TOP; it is drawn downward, so a stack is just
+  // the same call at descending y with no per-barrel offset bookkeeping.
+  function drawBarrel(c, x, y, bw, bh, col, lit, dark) {
+    var x0 = x - bw / 2;
+    px(c, x0, y, bw, bh, col);
+    px(c, x0, y, bw * 0.30, bh, lit);                            // sunlit side
+    px(c, x0 + bw * 0.80, y, bw * 0.20, bh, dark);
+    px(c, x0, y, bw, 4, lit);                                    // rim
+    px(c, x0, y + bh * 0.28, bw, 3, dark);                       // hoops
+    px(c, x0, y + bh * 0.68, bw, 3, dark);
+    px(c, x0, y + bh - 3, bw, 3, '#2A2118');
+  }
+
+  function drawCrate(c, x, y, cw, ch) {
+    px(c, x, y, cw, ch, TIMBER_LO);
+    px(c, x + 2, y + 2, cw - 4, ch - 4, '#8A6436');
+    px(c, x + 2, y + 2, cw - 4, 3, '#A88044');
+    px(c, x + 2, y + ch * 0.46, cw - 4, 3, '#6E5028');
+    px(c, x + cw * 0.44, y + 2, 3, ch - 4, '#6E5028');
+  }
+
+  /* -- BENCH at the foot of the A wall, from the reference shot. It is in
+     the front pass for draw order, not for occlusion: measured, it covers
+     0% of the A DOORWAY silhouette, because that doorway is deep and the
+     peeker stands well above the seat. Said plainly because the obvious
+     assumption ("front layer, so it must clip the peek") is wrong here. */
+  function drawBench(c, w, h) {
+    var r = gapPx('adoor', w, h);
+    var bx = r.x - w * 0.010, bw = r.w + w * 0.030;
+    var by = r.y + r.h - h * 0.016;
+    px(c, bx, by, bw, h * 0.016, TIMBER);
+    px(c, bx, by, bw, 4, TIMBER_HI);                             // sun on the seat
+    px(c, bx, by + h * 0.016, bw, 3, TIMBER_LO);
+    px(c, bx + w * 0.014, by + h * 0.016, 6, h * 0.030, TIMBER_LO);   // legs
+    px(c, bx + bw - w * 0.026, by + h * 0.016, 6, h * 0.030, TIMBER_LO);
+    px(c, bx - 4, by + h * 0.048, bw + 12, 4, 'rgba(60,44,22,0.25)'); // contact shadow
+  }
+
+  /* -- PAVING: warm cobble bands that deepen toward the viewer, with joints
+     converging on the archway. */
+  function drawPaving(c, w, h, horizon) {
+    px(c, 0, horizon, w, h - horizon, STONE);
+    px(c, 0, horizon, w, 3, '#8A7040');                          // the ground line
+    var vx = w * 0.4725, vy = horizon;                           // vanishing point: the arch
+    // bands: step grows quadratically so rows read as receding, not stacked
+    var y = horizon, step = h * 0.010, k = 0;
+    while (y < h) {
+      px(c, 0, y, w, 2, k % 2 ? '#A38C62' : STONE_LO);
+      if (k % 2) px(c, 0, y + 2, w, Math.max(2, step - 4), 'rgba(255,240,200,0.05)');
+      y += step; step *= 1.28; k++;
+    }
+    // converging joints
+    c.save();
+    c.strokeStyle = 'rgba(120,100,66,0.40)'; c.lineWidth = 2;
+    for (var i = -3; i <= 3; i++) {
+      c.beginPath();
+      c.moveTo(w * 0.5 + i * w * 0.30, h);
+      c.lineTo(vx + i * w * 0.020, vy);
+      c.stroke();
+    }
+    c.restore();
+    px(c, 0, horizon, w, h * 0.020, STONE_HI);                   // sunlit strip at the base
+  }
+
+  /* -- PALM: six blades off one point. Deliberately flat and dark; a palm
+     at this size is a silhouette, and any attempt at fronds becomes noise. */
+  function drawPalm(c, x, y, len) {
+    c.save();
+    px(c, x - 3, y, 6, len * 0.34, '#6B5A34');                   // trunk stub
+    for (var i = 0; i < 6; i++) {
+      var a = -Math.PI * 0.92 + i * (Math.PI * 0.84 / 5);
+      c.fillStyle = i < 3 ? PALM_HI : PALM;
+      c.beginPath();
+      c.moveTo(x, y);
+      c.quadraticCurveTo(x + Math.cos(a) * len * 0.7, y + Math.sin(a) * len * 0.7,
+                         x + Math.cos(a) * len, y + Math.sin(a) * len * 0.9);
+      c.quadraticCurveTo(x + Math.cos(a) * len * 0.6, y + Math.sin(a) * len * 0.5 + 6, x, y + 4);
+      c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+
+  /* -- THE WINDOW FRAME. Drawn last, over everything, because it is the
+     nearest thing in the scene and because it is what turns a picture into
+     an opening. The inner shadow is not decoration: an opening is darker at
+     its reveal than at its centre, and that single gradient is most of why
+     the ground behind it reads as further away. */
+  function drawWindowFrame(c, w, h) {
+    var x0 = w * OPEN_X0, x1 = w * OPEN_X1, y0 = h * OPEN_Y0, y1 = h * OPEN_Y1;
+    var i;
+
+    // inner shadow, four edges, five steps each — cheap, and entirely flat
+    for (i = 0; i < 5; i++) {
+      var a = (0.22 - i * 0.042).toFixed(3);
+      var d = i * 5;
+      px(c, x0 + d, y0, 5, y1 - y0, 'rgba(24,18,10,' + a + ')');
+      px(c, x1 - d - 5, y0, 5, y1 - y0, 'rgba(24,18,10,' + a + ')');
+      px(c, x0, y0 + d, x1 - x0, 5, 'rgba(24,18,10,' + a + ')');
+      px(c, x0, y1 - d - 5, x1 - x0, 5, 'rgba(24,18,10,' + a + ')');
     }
 
-    // ---- ground clutter (crates/barrels), clear of every gap's cover box ----
-    drawCrate(c, w * 0.395, floorTop - h * 0.16, w * 0.10, w * 0.10);
-    drawBarrel(c, w * 0.63, floorTop - h * 0.10, w * 0.075, '#a85a2e', '#c87a44');
-    drawBarrel(c, w * 0.70, floorTop - h * 0.08, w * 0.075, '#2e5f8a', '#4c82ae');
-    drawCrate(c, w * 0.865, floorTop - h * 0.06, w * 0.085, w * 0.085);
+    // --- jambs: plaster with the brick courses showing through at the
+    // broken inner edge, which is what makes them read as weathered rather
+    // than as two grey bars.
+    drawJamb(c, 0, 0, x0, h, +1);
+    drawJamb(c, x1, 0, w - x1, h, -1);
+
+    // --- head: rough timber beams across the top, plaster above them
+    px(c, 0, 0, w, y0, BRICKED);
+    px(c, 0, 0, w, h * 0.030, '#BE9E76');
+    var beamH = (y0 - h * 0.042) / 2;
+    for (i = 0; i < 2; i++) {
+      var by = h * 0.042 + i * beamH;
+      px(c, 0, by, w, beamH - 2, TIMBER);
+      px(c, 0, by, w, 4, TIMBER_HI);                             // sun along the top
+      px(c, 0, by + beamH - 6, w, 4, TIMBER_LO);
+      // grain: a few long nicks, never a repeating texture
+      for (var g = 0; g < 7; g++) {
+        var gx = (g * 0.1487 + i * 0.06) % 1;
+        px(c, gx * w, by + beamH * (i ? 0.30 : 0.58), w * 0.070, 2, 'rgba(40,28,14,0.45)');
+      }
+    }
+    px(c, 0, y0 - 3, w, 3, TIMBER_LO);
+    // the beams cast onto the top of the view
+    px(c, x0, y0, x1 - x0, h * 0.020, 'rgba(30,22,12,0.30)');
+
+    // --- sill: a worn wooden shelf, then the room's own dark interior. The
+    // AWP sits against that dark, which is the whole reason it is there.
+    px(c, 0, y1, w, h * 0.014, '#C6A874');                       // the lit front lip
+    px(c, 0, y1 + h * 0.014, w, h * 0.034, TIMBER);
+    px(c, 0, y1 + h * 0.014, w, 3, TIMBER_HI);
+    for (i = 0; i < 5; i++) {
+      px(c, (i * 0.21 + 0.03) * w, y1 + h * 0.024, w * 0.11, 2, 'rgba(40,28,14,0.40)');
+    }
+    px(c, 0, y1 + h * 0.048, w, h - (y1 + h * 0.048), '#241D14');
+    px(c, 0, y1 + h * 0.048, w, 3, '#150F0A');
   }
 
-  function drawCrate(c, x, y, w, h) {
-    px(c, x, y, w, h, '#3a2e1c');
-    px(c, x + 2, y + 2, w - 4, h - 4, '#8a6436');
-    px(c, x + 2, y + 2, w - 4, 3, '#a37c46');
-    for (var p = 6; p < h - 4; p += 10) px(c, x + 3, y + p, w - 6, 2, '#6e5028');
-  }
-  function drawBarrel(c, x, y, r, col, lit) {
-    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = '#241c14'; c.fill();
-    c.beginPath(); c.arc(x, y, r - 2, 0, Math.PI * 2); c.fillStyle = col; c.fill();
-    c.beginPath(); c.arc(x, y, r * 0.6, 0, Math.PI * 2); c.fillStyle = lit; c.fill();
+  function drawJamb(c, x, y, jw, jh, dir) {
+    px(c, x, y, jw, jh, BRICKED);
+    // the sunlit face is the left jamb's, the right jamb turns away
+    px(c, x + (dir > 0 ? 0 : jw * 0.62), y, jw * 0.38, jh, dir > 0 ? '#C0A57E' : '#8B7154');
+    // brick courses along the inner edge, offset every other row
+    var inner = dir > 0 ? x + jw - jw * 0.42 : x;
+    for (var r = 0, ry = y; ry < y + jh; r++, ry += 18) {
+      px(c, inner + (r % 2 ? 6 : 0), ry, jw * 0.42 - (r % 2 ? 6 : 0), 15, r % 3 ? BRICK : '#7D5B3E');
+      px(c, inner + (r % 2 ? 6 : 0), ry, jw * 0.42 - (r % 2 ? 6 : 0), 2, '#A87F58');
+    }
+    // the reveal edge itself: a hard 3px dark line is what reads as a corner
+    px(c, dir > 0 ? x + jw - 3 : x, y, 3, jh, '#2B2015');
   }
 
   // The peeking attacker, drawn inside the exposed angle's gap only. Same
@@ -439,6 +916,11 @@
     px(c, cx - s * 0.60, cy - s * 0.02, s * 0.30, s * 0.72, '#35382F');  // near arm
     px(c, cx - s * 0.95, cy + s * 0.10, s * 0.66, s * 0.16, '#1D1E1B');  // rifle held low
     px(c, cx - s * 0.44, cy + s * 1.30, s * 0.92, s * 0.16, '#191A17');  // contact shadow
+    // Sun rim down the LEFT edge, matching the scene's one light direction.
+    // Without it a dark silhouette inside GAP_SHADOW loses its own outline at
+    // 420px and the peek reads as the gap simply getting darker.
+    px(c, cx - s * 0.44, cy - s * 0.20, 2, s * 1.5, '#8C907F');
+    px(c, cx - s * 0.26, cy - s * 0.72, 2, s * 0.60, '#8C907F');
   }
 
   // First-person AWP, held bottom-right — the same held-corner composition
@@ -561,8 +1043,12 @@
       boltThrowT = 0;
     }
 
-    drawSite(c, w, h);
+    // Back scene -> enemy -> front scene. The sandwich is the whole point:
+    // the low wall's cap and the front barrel row are painted AFTER the
+    // silhouette, so a peeker is cut off by the cover it is peeking from.
+    drawSceneBack(c, w, h);
     drawEnemy(c, w, h);
+    drawSceneFront(c, w, h);
     if (state !== 'flicking') drawReticle(c);
     drawAwp(c, w, h);
     drawScope(c, w, h);

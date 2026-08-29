@@ -454,6 +454,69 @@ Five data-driven checks replace them, loading the module through a new
 so a third map is covered the day it lands. They also assert route-on-floor and
 solid-prop lane clearance, which is what caught the container above.
 
+## V23a — ART PASS (owner-directed, 2026-08-29) — **DONE**
+
+Three owner asks off his own reference shots.
+
+**1. A second AWP angle, 50/50 with the existing one** (`js/matchgames.js`).
+`AWP_ANGLES` is now an array of two: `middoors` (the old composition, moved
+verbatim) and `awindow` — A site from window, drawn off the owner's scoped
+screenshot. **The window enemy peeks RIGHT-TO-LEFT**, the mirror of mid doors,
+which is the entire point: the player cannot pre-learn one direction. Measured
+over 4,000 runs: 1968 / 2032. The scope, the gap geometry (`gapX = w/2 -
+gapW/2`) and the enemy body are shared helpers — there is no second set of
+offsets — and every timing is untouched. Picking is an index over the array, so
+a third angle is data, not another branch.
+
+**2. THE CLUTCH is now MIRAGE MID, not Dust 2 B** (`js/clutch.js`). The scene
+is framed by the window you are looking through — timber overhead, brick jambs,
+a worn sill — which is what buys it a real foreground; the flat bands of the
+first pass were the complaint. Blue house left, raised archway and minaret
+behind, barrels centre, the low dividing wall, the arched A doorway right. The
+five angles are PLACES in that architecture, not rectangles floated on it:
+BLUE HOUSE, ARCHWAY, BARRELS, SHORT WALL, A DOORWAY. Two of them (SHORT WALL,
+BARRELS) draw in two passes with the enemy sandwiched between, so the
+silhouette is genuinely occluded by the cover it peeks from — measured at 66%
+and 43% occlusion.
+
+**Nothing about the game changed with the art.** All eight tuning constants are
+byte-identical. If a commit ever moves a timing constant *and* art together,
+that commit is wrong.
+
+**3. The Dust 2 bhop map rebuilt** (`js/matchgames.js`). Owner: *"currently
+looks awful… stop adding so many text boxes with callouts."* Roofscape is now
+real building blocks with sunlit/shaded parapets; new per-surface ground
+texture (flagstone, cobble, blown sand with a sunward crest); wall thickness
+via a dark offset lip; three new prop types (`arch`, `awning`, `steps`).
+**Callout labels 11 → 2** — T SPAWN and A SITE, nothing else; the intro card
+already names the leg.
+
+### Measured, independently of the agents' reports
+
+| | before | after |
+|---|---|---|
+| Dust 2 largest single-colour share | 33.7% | **18.2%** |
+| Dust 2 distinct colours per frame | 58 | **270** |
+| Dust 2 callout labels | 11 | **2** |
+| Dust 2 track length | 3486.5 | **3486.5** (unchanged) |
+
+Track spread vs Nuke: **5.06** units. Every solid prop clears the lane
+(min 32.0). Route 200/200 samples on walkable floor. All five CLUTCH gaps
+measure exactly `#171310` (luminance 19.6) against covers of 93–200, so the
+worst contrast is **73.8** against a floor of 24.
+
+**Nuke is pixel-identical** — five frames rendered from the previous commit and
+from the new file, md5 match on every buffer. Every new behaviour is gated on a
+`theme` key Nuke does not declare.
+
+### Known and deliberately not done
+
+**Nuke's art is now the flatter of the two maps** (25–36 colours, ~46%
+single-tone dominance, 47.1 luminance separation vs Dust 2's 77.4). The
+ground-texture and wall-shadow passes are already keyed by `theme`, so giving
+Nuke the same treatment needs only `theme.ground` / `theme.shadow` values and
+an asphalt branch. Left alone because Nuke was not in scope.
+
 ## 1. LATE-GAME CONTENT (owner asked, never built)
 
 The biggest genuine gap in the game. Raised in the V15 list ("late-game

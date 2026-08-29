@@ -220,82 +220,118 @@
 
   /* ======================================================================
      MINIGAME 1 — AWP REACTION TEST
-     Holding mid doors on Dust 2. A CT crosses the gap after a random delay;
-     you have 300ms. Tapping before the peek is an early-shot loss, which is
-     what stops "hold the finger down and win" — the whole game is the wait.
+     Holding an angle on Dust 2. An enemy crosses the gap after a random
+     delay; you have 300ms. Tapping before the peek is an early-shot loss,
+     which is what stops "hold the finger down and win" — the whole game is
+     the wait.
+
+     TWO ANGLES, picked per run out of AWP_ANGLES. The peek window, the 300ms
+     reaction window, the scoring and the master timer are IDENTICAL on both —
+     the only things that differ are the picture and WHICH WAY HE CROSSES.
+     Mid doors peeks left-to-right; A site seen from window peeks
+     right-to-left. That mirror is the whole point of the variation: a player
+     who has learned to flick one way earns nothing for it, because the next
+     run is as likely to be the other. Anything that changed the timings
+     instead would turn a variation into a second, differently-tuned game.
+
+     Everything angle-specific is DATA in that array — the way BH_MAPS holds
+     the bhop maps — so a third angle is one more entry, never another branch.
      ====================================================================== */
-  function makeAwp() {
-    var STATE_WAIT = 0, STATE_PEEK = 1, STATE_OVER = 2;
-    var state = STATE_WAIT;
-    var peekAt = now() + 1500 + Math.random() * 2000;   // owner spec: 1.5–3.5s
-    var peekedAt = 0;
-    var flashUntil = 0;
-    var killfeedUntil = 0;
-    var reactionMs = 0;
 
-    function shoot() {
-      if (state === STATE_WAIT) {          // fired before he peeked
-        state = STATE_OVER;
-        beep('dink');
-        flashUntil = now() + 220;
-        setBanner('TOO EARLY', 'bad');
-        setTimeout(fail, 420);
-        return;
-      }
-      if (state === STATE_PEEK) {
-        reactionMs = now() - peekedAt;
-        state = STATE_OVER;
-        if (reactionMs <= 300) {
-          beep('awp');
-          killfeedUntil = now() + 3000;
-          setBanner(reactionMs + 'MS', 'good');
-          setTimeout(win, 380);
-        } else {
-          beep('dink');
-          flashUntil = now() + 220;
-          setBanner('TOO SLOW — ' + reactionMs + 'MS', 'bad');
-          setTimeout(fail, 420);
-        }
-      }
+  /* Scope geometry, derived ONCE from the centre of the lens and handed to
+     whichever angle was drawn. The gap the enemy crosses, the vignette and
+     the reticle all fall out of the same two numbers, so a new angle
+     physically cannot put the crosshair anywhere but on the slice of world
+     the player is holding. Hard-coding a second set of offsets per angle is
+     exactly how those two drift apart. */
+  function awpScene(w, h) {
+    var gapW = Math.round(w * 0.12);
+    var gapX = Math.round(w / 2 - gapW / 2);
+    var cxs = w / 2, cys = h * 0.46, R = w * 0.495;
+    return { gapW: gapW, gapX: gapX, cxs: cxs, cys: cys, R: R };
+  }
+
+  /* The enemy silhouette, shared by every angle. `dir` is his direction of
+     travel; the trailing arm and the rifle mirror with it, so he is never
+     walking backwards holding the gun behind him. The BODY IS THE SAME SIZE
+     on both angles on purpose — a smaller target on one of them would make
+     the two angles different tests, and the reaction window is meant to be
+     the only difficulty in this game. Only the palette changes. */
+  var AWP_CT_BODY = ['#3D4038', '#2B2E28', '#4B4D43', '#33352E',
+                     '#35382F', '#1D1E1B', '#2A2C25', '#191A17'];
+  // Backlit against a bright site, he reads almost as a cut-out — which is
+  // what the owner's window reference actually shows.
+  var AWP_T_BODY = ['#2A2621', '#1A1815', '#372F26', '#201C17',
+                    '#252119', '#131211', '#1E1B17', '#100F0E'];
+
+  function awpEnemy(c, x, y, dir, pal) {
+    var ax = dir > 0 ? x - 7 : x + 24;      // near arm, mirrored about the torso
+    var gx = dir > 0 ? x - 14 : x + 20;     // ...and the rifle with it
+    px(c, x, y + 16, 26, 46, pal[0]);       // torso / vest
+    px(c, x + 2, y + 22, 22, 12, pal[1]);   // chest rig
+    px(c, x + 6, y, 15, 17, pal[2]);        // head
+    px(c, x + 4, y - 4, 19, 7, pal[3]);     // helmet
+    px(c, ax, y + 24, 9, 22, pal[4]);       // near arm
+    px(c, gx, y + 30, 20, 5, pal[5]);       // rifle
+    px(c, x + 3, y + 62, 10, 24, pal[6]);   // legs
+    px(c, x + 15, y + 62, 10, 24, pal[6]);
+    px(c, x + 1, y + 86, 26, 5, pal[7]);    // contact shadow
+  }
+
+  /* The scope itself: the black vignette with its circular cut, the lens
+     shading, and the reticle. Drawn over whatever world the angle painted,
+     from S alone — so both angles get the identical optic and the crosshair
+     lands on the gap on both. */
+  function awpDrawScope(c, w, h, S) {
+    var i, cxs = S.cxs, cys = S.cys, R = S.R;
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, w, h);
+    c.arc(cxs, cys, R, 0, Math.PI * 2, true);
+    c.fillStyle = '#000000';
+    c.fill('evenodd');
+    c.restore();
+    // lens shading just inside the rim, so the glass has depth
+    c.save();
+    c.globalAlpha = 0.22;
+    for (i = 0; i < 5; i++) {
+      c.strokeStyle = '#000000'; c.lineWidth = 4;
+      c.beginPath(); c.arc(cxs, cys, R - 2 - i * 4, 0, Math.PI * 2); c.stroke();
     }
+    c.restore();
+    px(c, 0, cys - 1, w, 2, '#000000');                 // scope crosshair
+    px(c, cxs - 1, 0, 2, h, '#000000');
+    for (i = 1; i <= 3; i++) {                          // mil-dots
+      px(c, cxs - 2, cys + i * 18, 4, 2, '#000000');
+      px(c, cxs + i * 18, cys - 1, 2, 4, '#000000');
+    }
+  }
 
-    return {
-      id: 'awp',
-      probe: function () { return { state: state, sincePeek: state >= STATE_PEEK ? now() - peekedAt : -1, reactionMs: reactionMs }; },
-      down: function () { shoot(); },
-      update: function () {
-        if (state === STATE_WAIT && now() >= peekAt) { state = STATE_PEEK; peekedAt = now(); }
-        // Missed the window entirely — he crossed and you never fired.
-        if (state === STATE_PEEK && now() - peekedAt > 300) {
-          state = STATE_OVER;
-          beep('dink');
-          flashUntil = now() + 220;
-          setBanner('HE CROSSED — TOO SLOW', 'bad');
-          setTimeout(fail, 420);
-        }
-      },
-      /* The composition is the owner's reference shot: mid doors on Dust 2 down
-         an AWP scope. Arched double doors filling the top, a narrow bright gap
-         between them, sunlit stone slabs in the bottom third, and the whole
-         thing behind a big black scope vignette with thin crosshair lines.
-         Everything is flat rects on a 6-12px grid so it stays pixel art. */
-      draw: function (c, w, h) {
+  var AWP_ANGLES = [
+
+    /* ------------------------------------------------------- MID DOORS */
+    {
+      id: 'middoors',
+      name: 'MID DOORS',
+      hint: 'HOLD MID DOORS',
+      peekDir: 1,                    // he crosses LEFT to RIGHT
+      /* The composition is the owner's first reference shot: mid doors on
+         Dust 2 down an AWP scope. Arched double doors filling the top, a
+         narrow bright gap between them, sunlit stone slabs in the bottom
+         third. Everything is flat rects on a 6-12px grid so it stays pixel
+         art. `t` is his crossing, 0..1, or -1 when he is not on screen. */
+      drawWorld: function (c, w, h, S, t) {
+        var gapW = S.gapW, gapX = S.gapX;
         var doorBottom = h * 0.52;                          // doors meet floor
-        // The gap is centred on the scope, so the crosshair sits exactly on the
-        // slice of light the CT walks through. You are holding that angle —
-        // the reticle belongs on it, not off to one side of it.
-        var gapW = Math.round(w * 0.12);
-        var gapX = Math.round(w / 2 - gapW / 2);
-
         var i, x;
 
         /* ---- the doors, drawn SOLID across the whole frame ----
-           An earlier pass punched the gap by skipping plank columns, but planks
-           are 12px and the gap is 50, so the opening snapped out to whatever
-           the column grid allowed — 72px, half again too wide. The doors are
-           now continuous and the view through them is clipped to an exact
-           rect below, which also means the gap width is a real number rather
-           than a consequence of the plank pitch. */
+           An earlier pass punched the gap by skipping plank columns, but
+           planks are 12px and the gap is 50, so the opening snapped out to
+           whatever the column grid allowed — 72px, half again too wide. The
+           doors are now continuous and the view through them is clipped to an
+           exact rect below, which also means the gap width is a real number
+           rather than a consequence of the plank pitch. */
         for (x = 0; x < w; x += 12) {
           var lit = ((x / 12) | 0) % 3 === 0;
           px(c, x, 0, 12, doorBottom, lit ? '#8B7150' : '#7A6244');
@@ -326,20 +362,7 @@
         // The CT, stepping out across the gap. Inside the clip, so the door
         // edges cut him off — he emerges from behind timber rather than
         // appearing on top of it.
-        if (state === STATE_PEEK || (state === STATE_OVER && killfeedUntil > now())) {
-          var t = clamp((now() - peekedAt) / 900, 0, 1);
-          var cx = gapX - 14 + t * gapW;
-          var cy = doorBottom - 108;
-          px(c, cx, cy + 16, 26, 46, '#3D4038');            // torso / vest
-          px(c, cx + 2, cy + 22, 22, 12, '#2B2E28');        // chest rig
-          px(c, cx + 6, cy, 15, 17, '#4B4D43');             // head
-          px(c, cx + 4, cy - 4, 19, 7, '#33352E');          // helmet
-          px(c, cx - 7, cy + 24, 9, 22, '#35382F');         // near arm
-          px(c, cx - 14, cy + 30, 20, 5, '#1D1E1B');        // rifle
-          px(c, cx + 3, cy + 62, 10, 24, '#2A2C25');        // legs
-          px(c, cx + 15, cy + 62, 10, 24, '#2A2C25');
-          px(c, cx + 1, cy + 86, 26, 5, '#191A17');         // contact shadow
-        }
+        if (t >= 0) awpEnemy(c, gapX - 14 + t * gapW, doorBottom - 108, 1, AWP_CT_BODY);
         c.restore();
 
         // the two door edges facing the gap: bright rim, then shadow
@@ -351,7 +374,7 @@
         /* ---- the arch above the doors, stepped 6px so it reads as pixels ----
            Tuned so the crown lands just inside the TOP of the scope circle.
            Geometry that peaks above the circle is invisible: everything
-           outside the lens is painted flat black a few lines further down. */
+           outside the lens is painted flat black by awpDrawScope(). */
         var archCx = w / 2, archCy = h * 0.62, archR = w * 0.75;
         for (x = 0; x < w; x += 6) {
           var ax = x + 3 - archCx;
@@ -372,30 +395,239 @@
           var stagger = ((sy / 34) | 0) % 2 ? 40 : 0;
           for (x = stagger; x < w; x += 84) px(c, x, sy, 3, 34, sy < lightY ? '#8A8578' : '#ADA694');
         }
+      }
+    },
 
-        // ---- scope: black vignette with a circular cut, then the reticle ----
-        var cxs = w / 2, cys = h * 0.46, R = w * 0.495;
-        c.save();
-        c.beginPath();
-        c.rect(0, 0, w, h);
-        c.arc(cxs, cys, R, 0, Math.PI * 2, true);
-        c.fillStyle = '#000000';
-        c.fill('evenodd');
-        c.restore();
-        // lens shading just inside the rim, so the glass has depth
-        c.save();
-        c.globalAlpha = 0.22;
-        for (i = 0; i < 5; i++) {
-          c.strokeStyle = '#000000'; c.lineWidth = 4;
-          c.beginPath(); c.arc(cxs, cys, R - 2 - i * 4, 0, Math.PI * 2); c.stroke();
+    /* --------------------------------------------- A SITE, FROM WINDOW */
+    {
+      id: 'awindow',
+      name: 'A SITE — WINDOW',
+      hint: 'HOLD A FROM WINDOW',
+      /* THE OTHER DIRECTION, deliberately: he comes out of the doorway on the
+         right and walks LEFT across the reticle. See the block comment on
+         AWP_ANGLES — this mirror is the reason the second angle exists. */
+      peekDir: -1,
+      /* The owner's second reference shot: Dust 2 seen from A-site window.
+         Bright sky over a stepped cream skyline, a coursed stone wall down the
+         left with crates and a barrel against it, wide shallow steps falling
+         away across the lower left, pale flagstone paving, and the dark
+         arched doorway just right of centre that he steps out of. */
+      drawWorld: function (c, w, h, S, t) {
+        var gapW = S.gapW, gapX = S.gapX, cys = S.cys, R = S.R;
+        /* Every anchor comes off the LENS, not off the frame. Outside the
+           circle awpDrawScope() paints flat black, so art composed against the
+           canvas edge is art nobody ever sees — the same lesson the mid-doors
+           iron bands and arch crown both had to learn. */
+        var skyB = Math.round(cys - R * 0.46);    // roofline, and the sky's base
+        var farB = Math.round(cys - R * 0.05);    // far wall meets the paving
+        var wallT = Math.round(cys - R * 0.36);   // top of the near stone wall
+        var wallB = farB + Math.round(R * 0.26);  // ...and where it meets ground
+        var i, x, y, bl;
+
+        // ---- sky, banded rather than graded so it stays flat pixel art ----
+        px(c, 0, 0, w, skyB, '#4E9BD6');
+        px(c, 0, skyB - 74, w, 74, '#6FB4E4');
+        px(c, 0, skyB - 32, w, 32, '#9CCFEE');
+        px(c, 0, skyB - 11, w, 11, '#C6E4F5');                // haze on the horizon
+
+        /* ---- the far side of the site. Pale cream and sandstone blocks with
+           a STEPPED skyline, so the roofline bites into the sky instead of
+           ruling one flat line across it. Fractions of w and R, so the
+           composition holds at any canvas size.
+           [x, width, rise above the roofline, face, sunlit cap] */
+        var BLOCKS = [
+          [-0.06, 0.31, 0.30, '#D9C8A2', '#EFE0BC'],
+          [0.20, 0.19, 0.13, '#C6B58D', '#E2D2AC'],
+          [0.35, 0.31, 0.42, '#E0D0AB', '#F2E6C6'],
+          [0.62, 0.21, 0.19, '#CBB994', '#E6D6B0'],
+          [0.79, 0.29, 0.34, '#D2C199', '#ECDCB6']
+        ];
+        for (i = 0; i < BLOCKS.length; i++) {
+          bl = BLOCKS[i];
+          var fx = Math.round(bl[0] * w), fw = Math.round(bl[1] * w);
+          var ft = Math.round(skyB - bl[2] * R);
+          px(c, fx, ft, fw, farB - ft, bl[3]);
+          px(c, fx, ft, fw, 7, bl[4]);                        // sunlit parapet cap
+          px(c, fx, ft + 7, fw, 3, '#A08C68');                // and its shadow
+          px(c, fx + fw - 6, ft, 6, farB - ft, '#A8926B');    // shaded right return
+          // small dark shuttered windows, on a grid inside the block face
+          for (x = fx + 16; x < fx + fw - 24; x += 40) {
+            for (y = ft + 28; y < farB - 34; y += 56) {
+              px(c, x - 3, y - 3, 24, 32, '#9A8560');         // reveal
+              px(c, x, y, 18, 26, '#2E2519');                 // the opening
+              px(c, x, y, 18, 5, '#221B12');                  // lintel shadow
+              px(c, x + 8, y, 2, 26, '#4A3D28');              // the shutter split
+            }
+          }
         }
-        c.restore();
-        px(c, 0, cys - 1, w, 2, '#000000');                 // scope crosshair
-        px(c, cxs - 1, 0, 2, h, '#000000');
-        for (i = 1; i <= 3; i++) {                          // mil-dots
-          px(c, cxs - 2, cys + i * 18, 4, 2, '#000000');
-          px(c, cxs + i * 18, cys - 1, 2, 4, '#000000');
+        // one balcony, on the tall centre block — the detail the reference
+        // shot leads with, and the only thing on that wall with depth
+        var balX = Math.round(0.37 * w), balW = Math.round(0.17 * w);
+        var balY = Math.round(farB - R * 0.26);
+        px(c, balX, balY - 17, balW, 3, '#A38E64');           // rail
+        for (x = balX + 3; x < balX + balW - 3; x += 9)
+          px(c, x, balY - 14, 3, 14, '#8E7A54');              // balusters
+        px(c, balX, balY, balW, 9, '#B8A176');                // slab
+        px(c, balX, balY, balW, 3, '#DCC79A');
+
+        /* ---- the doorway, and the corner of shade beside it. Placed OFF the
+           gap the scope holds — it starts a few pixels inside the gap's RIGHT
+           edge — so he steps out of the dark and INTO the reticle rather than
+           materialising on it. Derived from gapX/gapW like everything else. */
+        var dwX = gapX + Math.round(gapW / 2), dwW = gapW + 30;
+        var dwT = Math.round(farB - R * 0.40);
+        px(c, dwX - 7, dwT - 27, dwW + 14, farB - dwT + 27, '#A08A62');  // surround
+        px(c, dwX - 7, dwT - 27, dwW + 14, 5, '#D6C094');                // lintel course
+        for (x = 0; x < dwW; x += 4) {                        // the arched opening
+          var av = (x + 2 - dwW / 2) / (dwW / 2);
+          var arcT = dwT - Math.round(Math.sqrt(Math.max(0, 1 - av * av)) * 19);
+          px(c, dwX + x, arcT, 4, farB - arcT, '#241D14');
         }
+        px(c, dwX + dwW + 7, dwT - 12, 13, farB - dwT + 12, '#6E5C41');  // the corner beside it
+
+        /* ---- the paving. Pale flagstone, warmer where the sun lands. Drawn
+           before the near wall so the wall sits on top of it, which is the
+           only order that gets the wall's own shadow to fall the right way. */
+        px(c, 0, farB, w, h - farB, '#C7BB9A');
+        px(c, 0, farB, w, 5, '#9E9070');                      // far wall's shadow
+        var sunY = farB + Math.round(R * 0.13);
+        px(c, 0, sunY, w, h - sunY, '#DCD1AF');               // the sunlit half
+        px(c, 0, sunY - 4, w, 4, '#A89A79');
+        for (y = farB + 24; y < h; y += 30) {                 // flagstone courses
+          px(c, 0, y, w, 3, y < sunY ? '#A89A79' : '#C4B896');
+          var st = (((y - farB) / 30) | 0) % 2 ? 44 : 0;
+          for (x = st; x < w; x += 88) px(c, x, y, 3, 30, y < sunY ? '#A89A79' : '#C4B896');
+        }
+        // Loose grit, from bhHash rather than Math.random: a scatter re-rolled
+        // every frame boils, and this function runs at 60fps.
+        for (i = 0; i < 30; i++) {
+          var g1 = bhHash(i * 13 + 1, 7), g2 = bhHash(i * 5 + 3, 29);
+          px(c, g1 * w, farB + 10 + g2 * R * 0.95, 3 + (g1 > 0.72 ? 2 : 0), 3,
+             g2 > 0.5 ? '#B0A281' : '#9C8F70');
+        }
+
+        /* ---- the wide shallow steps falling away across the LOWER LEFT.
+           Each tread is a little shorter than the one above it, which is what
+           makes them descend toward the camera instead of stacking. */
+        for (i = 0; i < 4; i++) {
+          var ty = wallB - 6 + i * 22, tw = Math.round(w * (0.66 - i * 0.055));
+          px(c, 0, ty, tw, 22, '#D2C6A4');                    // tread
+          px(c, 0, ty, tw, 5, '#EFE6C6');                     // lit nosing
+          px(c, 0, ty + 17, tw, 5, '#A59774');                // riser, in shade
+          px(c, tw - 5, ty, 5, 22, '#A59774');                // the open end
+        }
+
+        /* ---- the coursed stone wall down the LEFT, with real thickness ---- */
+        var wR = Math.round(w * 0.27);
+        px(c, 0, wallT, wR, wallB - wallT, '#B39C71');        // the face
+        for (y = wallT + 12; y < wallB; y += 20) {            // block courses
+          px(c, 0, y, wR, 3, '#96805A');
+          var cst = (((y - wallT) / 20) | 0) % 2 ? 34 : 0;
+          for (x = cst; x < wR; x += 68) px(c, x, y, 3, 20, '#96805A');
+        }
+        px(c, 0, wallT, wR, 9, '#DCC79A');                    // sunlit cap
+        px(c, 0, wallT + 9, wR, 4, '#8A7550');                // and its shade
+        px(c, wR - 8, wallT, 8, wallB - wallT, '#8E7853');    // the shaded return
+        px(c, 0, wallB - 4, wR + 22, 4, '#8A7C5E');           // where it meets ground
+
+        /* Stacked wooden crates and a barrel against the wall — the map's own
+           furniture, not invented set dressing. Both are held clear of gapX:
+           a first pass put the barrel at x 185, dead on the gap, where it
+           stood in the middle of the slice the player is holding and he
+           walked out from behind it. Anything in this scene that reaches
+           gapX is in the way of the game. */
+        var kx = wR - 26;                                     // crates: 87..157 at 420 wide
+        px(c, kx, wallB - 76, 70, 76, '#6B4E2B');
+        px(c, kx + 3, wallB - 73, 64, 70, '#B08551');
+        px(c, kx + 3, wallB - 73, 64, 6, '#C89C63');
+        for (i = 1; i < 4; i++) px(c, kx + 3, wallB - 73 + i * 17, 64, 3, '#8E6C40');
+        px(c, kx + 8, wallB - 120, 54, 46, '#6B4E2B');        // the smaller one on top
+        px(c, kx + 11, wallB - 117, 48, 40, '#BC9159');
+        px(c, kx + 11, wallB - 117, 48, 5, '#D2A66C');
+        var brx = Math.round(w * 0.10);                       // barrel, further left again
+        px(c, brx, wallB - 54, 34, 54, '#5E3A22');            // the barrel
+        px(c, brx + 3, wallB - 54, 28, 54, '#A6612F');
+        px(c, brx + 3, wallB - 54, 28, 5, '#C67C42');
+        px(c, brx + 3, wallB - 38, 28, 4, '#7E4722');
+        px(c, brx + 3, wallB - 20, 28, 4, '#7E4722');
+
+        /* ---- him, walking RIGHT to LEFT out of the doorway. His path is the
+           exact mirror of mid doors' about the gap centre, so the two angles
+           are the same test in opposite directions rather than two different
+           ones. He stands on the scope's own centre line, which is what puts
+           his chest under the reticle on both angles. */
+        if (t >= 0) awpEnemy(c, gapX + gapW - 26 - (-14 + t * gapW), cys - 58, -1, AWP_T_BODY);
+      }
+    }
+  ];
+
+  function makeAwp() {
+    var STATE_WAIT = 0, STATE_PEEK = 1, STATE_OVER = 2;
+    var state = STATE_WAIT;
+    var peekAt = now() + 1500 + Math.random() * 2000;   // owner spec: 1.5–3.5s
+    var peekedAt = 0;
+    var flashUntil = 0;
+    var killfeedUntil = 0;
+    var reactionMs = 0;
+    /* The 50/50 the owner asked for, expressed as an index over the array
+       rather than a coin flip, so a third angle is picked automatically the
+       moment it is added instead of being unreachable. */
+    var A = AWP_ANGLES[Math.floor(Math.random() * AWP_ANGLES.length)];
+
+    function shoot() {
+      if (state === STATE_WAIT) {          // fired before he peeked
+        state = STATE_OVER;
+        beep('dink');
+        flashUntil = now() + 220;
+        setBanner('TOO EARLY', 'bad');
+        setTimeout(fail, 420);
+        return;
+      }
+      if (state === STATE_PEEK) {
+        reactionMs = now() - peekedAt;
+        state = STATE_OVER;
+        if (reactionMs <= 300) {
+          beep('awp');
+          killfeedUntil = now() + 3000;
+          setBanner(reactionMs + 'MS', 'good');
+          setTimeout(win, 380);
+        } else {
+          beep('dink');
+          flashUntil = now() + 220;
+          setBanner('TOO SLOW — ' + reactionMs + 'MS', 'bad');
+          setTimeout(fail, 420);
+        }
+      }
+    }
+
+    return {
+      id: 'awp',
+      probe: function () {
+        return { state: state, sincePeek: state >= STATE_PEEK ? now() - peekedAt : -1,
+                 reactionMs: reactionMs, angle: A.id, peekDir: A.peekDir };
+      },
+      down: function () { shoot(); },
+      update: function () {
+        if (state === STATE_WAIT && now() >= peekAt) { state = STATE_PEEK; peekedAt = now(); }
+        // Missed the window entirely — he crossed and you never fired.
+        if (state === STATE_PEEK && now() - peekedAt > 300) {
+          state = STATE_OVER;
+          beep('dink');
+          flashUntil = now() + 220;
+          setBanner('HE CROSSED — TOO SLOW', 'bad');
+          setTimeout(fail, 420);
+        }
+      },
+      draw: function (c, w, h) {
+        var S = awpScene(w, h);
+        /* His crossing, 0..1, or -1 when he is not on screen. Computed HERE
+           rather than inside an angle, so both angles animate off the one
+           clock and neither can quietly invent its own peek timing. */
+        var showHim = (state === STATE_PEEK || (state === STATE_OVER && killfeedUntil > now()));
+        var t = showHim ? clamp((now() - peekedAt) / 900, 0, 1) : -1;
+
+        A.drawWorld(c, w, h, S, t);
+        awpDrawScope(c, w, h, S);
 
         if (now() < flashUntil) px(c, 0, 0, w, h, 'rgba(255,60,60,0.42)');
 
@@ -416,8 +648,10 @@
           pixelText(c, 'ENEMY', kx + kw - 8, ky + kh / 2, 11, '#FF8C8C', 'right');
         }
 
+        // Naming the angle while he waits is the same courtesy the bhop map
+        // card pays: with two of them, which one you drew is worth knowing.
         if (state === STATE_WAIT) {
-          pixelText(c, 'HOLD THE ANGLE', w / 2, h - 26, 12, '#E8E2D0', 'center');
+          pixelText(c, A.hint, w / 2, h - 26, 12, '#E8E2D0', 'center');
         }
       }
     };
@@ -868,10 +1102,15 @@
     /* -------------------------------------------------------------- DUST 2 */
     /* T SPAWN -> OUTSIDE LONG -> LONG DOUBLE DOORS -> LONG A -> A SITE, the
        iconic long run, traced off the owner's radar shots. Its track length is
-       3486 units against Nuke's 3492 — within 6 — so ONE set of speed/beat
+       3486.5 units against Nuke's 3491.5 — within 5 — so ONE set of speed/beat
        constants keeps both routes at the same "clean run ~9.4s, mashing loses"
        tuning. Reshaping either route without re-checking that is how a map
-       silently becomes free; the suite asserts both ends for every map. */
+       silently becomes free; the suite asserts both ends for every map.
+
+       The V23 art pass rebuilt everything this map DRAWS — the roofscape, the
+       ground, the wall thickness, the prop vocabulary — and deliberately did
+       not touch `path` by a single unit, because the path IS the track length
+       and the whole tuning hangs off it. Art is free; geometry is not. */
     dust2: {
       id: 'dust2',
       name: 'DUST 2',
@@ -883,13 +1122,24 @@
          darkening everything unwalkable, and so do we — structure is a
          deliberately darker, cooler ochre, and every walkable surface is
          lighter and warmer. Measured separation is 53–104 units of luminance,
-         comfortably past the 24 the suite demands. */
+         comfortably past the 24 the suite demands, and the ground TEXTURE
+         tones below stay inside that same band on purpose. */
       theme: {
         mass: '#6B5B42',                                   // structure mass
         seam: '#5A4B36',
         kerb: '#E0CFA8',
+        // The wall's own depth. A kerb alone is a painted outline; this is the
+        // dark lip that falls off its far side and gives it thickness. Nuke
+        // has no `shadow` key and is therefore rendered exactly as before.
+        shadow: '#463A28',
         // 0 packed sand, 1 paved stone (the site platform, doubles), 2 shade
         surf: ['#C4A87A', '#D6C49B', '#A88F66'],
+        // Which ground-texture pass to run over the surfaces. Flat fills are
+        // what made this map read as tan rectangles: the real thing is
+        // flagstone, cobble and blown sand, and none of that survives as one
+        // colour. Keyed rather than boolean so Nuke's asphalt stays untouched
+        // and a third map can bring its own.
+        ground: 'sand',
         route: '#E8DCC0',        // chalk scuff, not paint — yellow on sand reads wrong
         detail: 'dust2',
         backdrop: 'dome'
@@ -911,70 +1161,101 @@
         // A SITE — the paved platform the run ends on
         [430, 140, 450, 720, 1],
         // --- neighbours, never entered ---
-        [880, 1240, 190, 280, 2],   // PIT
-        [900, 240, 170, 320, 0],    // CARS
-        [150, 220, 250, 330, 2],    // CT SPAWN
-        [60, 1360, 210, 520, 2],    // CATWALK / MID
-        [60, 2700, 180, 300, 2]     // T RAMP
+        [880, 1240, 190, 280, 2],   // the pit
+        [900, 240, 170, 320, 0],    // the car park
+        [150, 220, 250, 330, 2],    // CT side
+        [60, 1360, 210, 520, 2],    // catwalk / mid
+        [60, 2700, 180, 300, 2],    // T ramp
+        /* Three shaded alcoves cut off the route. They exist so the floor
+           union has a broken, courtyard-ish silhouette instead of a chain of
+           rectangles — the outline of the walkable area is most of what sells
+           this as a town from above. Each one touches a room it opens off, or
+           it would float as an island of floor in the middle of a building. */
+        [300, 2380, 110, 220, 2],   // alcove west of Outside Long
+        [760, 2180, 140, 150, 2],   // ...and east
+        [830, 700, 140, 200, 2]     // the corner between Long and the cars
       ],
+      /* TWO callouts, down from eleven. The owner's note was blunt: the start
+         and the destination earn their labels and everything else is clutter
+         you read once and then run over for the rest of the game. The intro
+         card already names the leg, so the map does not need to narrate
+         itself a third time. */
       labels: [
-        ['T SPAWN', 200, 3520, 13], ['T RAMP', 150, 2850, 10],
-        ['OUTSIDE', 440, 2420, 12], ['DOUBLES', 430, 2120, 10],
-        ['LONG A', 775, 1400, 12], ['PIT', 975, 1380, 10],
-        ['CATWALK', 165, 1450, 10], ['MID', 165, 1750, 10],
-        ['A SITE', 500, 400, 14], ['CARS', 985, 400, 10],
-        ['CT SPAWN', 275, 380, 10]
+        ['T SPAWN', 200, 3520, 13],
+        ['A SITE', 500, 400, 14]
       ],
       // the stone well in Outside Long — Dust 2's answer to the silo, and the
       // one round landmark on the route
       feature: { kind: 'well', x: 450, y: 2380, r: 62 },
-      /* Set dressing from the owner's B-site reference shots, which are the
-         same vocabulary the whole map is built from: stacked wooden crates,
-         rust and blue barrels, the tarp-covered pallet, the beige cars, and
-         loose rubble. All clear of the running lane. */
+      /* Set dressing from the owner's reference shots, and all of it the same
+         vocabulary the real map is built from: stacked wooden crates, rust and
+         blue barrels, tarped pallets, the beige cars, loose rubble — plus the
+         three the V23 pass added, which are the things that make a courtyard
+         read as architecture rather than as a yard: doorway ARCHES through the
+         walls, cloth AWNINGS over them, and the STEPS up onto the A platform.
+         Every solid one is held clear of the running lane; the flat ones
+         (rubble) are paint the player is meant to run straight over. */
       props: [
         // --- T Spawn ---
         { t: 'crate', x: 140, y: 3540, w: 92, h: 92 },
         { t: 'crate', x: 146, y: 3450, w: 74, h: 74 },
+        { t: 'crate', x: 168, y: 3660, w: 70, h: 70 },
         { t: 'barrel', x: 496, y: 3592, w: 46, h: 46, v: 0 },
         { t: 'barrel', x: 538, y: 3616, w: 46, h: 46, v: 1 },
         { t: 'rubble', x: 200, y: 3300, w: 130, h: 80 },
+        { t: 'rubble', x: 330, y: 3420, w: 100, h: 60 },
+        { t: 'steps', x: 140, y: 3286, w: 150, h: 40 },
         // --- out of spawn ---
         { t: 'crate', x: 268, y: 3170, w: 80, h: 80 },
         { t: 'pallet', x: 596, y: 3000, w: 92, h: 62 },
         { t: 'barrel', x: 408, y: 2700, w: 44, h: 44, v: 1 },
         { t: 'barrel', x: 448, y: 2676, w: 44, h: 44, v: 0 },
         { t: 'crate', x: 648, y: 2820, w: 70, h: 70 },
+        { t: 'awning', x: 76, y: 2760, w: 84, h: 38 },
         // --- Outside Long ---
         { t: 'crate', x: 688, y: 2300, w: 66, h: 66 },
         { t: 'rubble', x: 618, y: 2500, w: 100, h: 70 },
+        { t: 'rubble', x: 670, y: 2540, w: 85, h: 60 },
+        { t: 'barrel', x: 320, y: 2440, w: 42, h: 42, v: 0 },
+        { t: 'awning', x: 786, y: 2200, w: 80, h: 36 },
         /* --- Doubles. Both barrels sit LEFT of the lane: the room is only 180
            units wide and the route cuts it diagonally, so the strip right of
            the lane is too narrow to hold a barrel without either clipping on
            the floor edge or standing in the player's path. */
         { t: 'barrel', x: 486, y: 2196, w: 42, h: 42, v: 0 },
         { t: 'barrel', x: 514, y: 2040, w: 42, h: 42, v: 1 },
+        { t: 'arch', x: 482, y: 2044, w: 56, h: 26 },
         // --- the dogleg ---
         { t: 'crate', x: 738, y: 1900, w: 62, h: 62 },
         { t: 'pallet', x: 528, y: 1780, w: 84, h: 56 },
+        { t: 'arch', x: 594, y: 1744, w: 56, h: 26 },
         // --- Long A, lining both sides of the straight ---
+        { t: 'barrel', x: 612, y: 1700, w: 42, h: 42, v: 1 },
         { t: 'crate', x: 598, y: 1600, w: 58, h: 58 },
         { t: 'crate', x: 598, y: 1524, w: 58, h: 58 },
         { t: 'barrel', x: 782, y: 1452, w: 44, h: 44, v: 1 },
         { t: 'barrel', x: 782, y: 1400, w: 44, h: 44, v: 0 },
+        { t: 'crate', x: 770, y: 1300, w: 54, h: 54 },
         { t: 'rubble', x: 594, y: 1180, w: 62, h: 120 },
         { t: 'crate', x: 776, y: 1046, w: 52, h: 52 },
         { t: 'barrel', x: 604, y: 946, w: 44, h: 44, v: 0 },
+        { t: 'awning', x: 96, y: 1470, w: 84, h: 38 },
+        { t: 'crate', x: 900, y: 1280, w: 60, h: 60 },
+        { t: 'crate', x: 852, y: 760, w: 56, h: 56 },
         // --- A site ---
+        { t: 'steps', x: 440, y: 790, w: 200, h: 44 },
+        { t: 'pallet', x: 796, y: 700, w: 90, h: 60 },
+        { t: 'barrel', x: 516, y: 616, w: 44, h: 44, v: 1 },
+        { t: 'barrel', x: 556, y: 640, w: 44, h: 44, v: 0 },
+        { t: 'awning', x: 444, y: 560, w: 80, h: 36 },
+        { t: 'rubble', x: 470, y: 500, w: 110, h: 70 },
         { t: 'car', x: 756, y: 396, w: 112, h: 192 },
         { t: 'crate', x: 466, y: 300, w: 84, h: 84 },
         { t: 'crate', x: 472, y: 224, w: 66, h: 66 },
-        { t: 'barrel', x: 516, y: 616, w: 44, h: 44, v: 1 },
-        { t: 'barrel', x: 556, y: 640, w: 44, h: 44, v: 0 },
-        { t: 'pallet', x: 796, y: 700, w: 90, h: 60 },
-        { t: 'rubble', x: 470, y: 500, w: 110, h: 70 },
-        // --- the CARS neighbour ---
-        { t: 'car', x: 926, y: 300, w: 104, h: 180 }
+        // --- the neighbours ---
+        { t: 'car', x: 926, y: 300, w: 104, h: 180 },
+        { t: 'barrel', x: 936, y: 500, w: 44, h: 44, v: 1 },
+        { t: 'pallet', x: 300, y: 220, w: 88, h: 58 }
       ],
       path: [[300, 3600], [560, 2760], [560, 2180], [700, 1760], [700, 900], [620, 180]],
       finishSpan: [430, 880]
@@ -1251,9 +1532,23 @@
                 px(c, bx + 22, by + 26, 44, 4, '#B6BAB4');
               }
             } else {
-              /* Dust 2 from above is a flat-roofed town: parapets, courtyards
-                 cut into the block, awnings, and the occasional small dome
-                 picking up the skyline from the reference shots. */
+              /* Dust 2 from above is a flat-roofed sandstone TOWN, and the
+                 old pass drew it as one flat ochre field with the odd blob
+                 dropped on it — which is most of why the owner said the map
+                 looked awful. Every cell is now a BUILDING BLOCK in its own
+                 right: its own ochre out of three, a parapet catching the sun
+                 on the north-west edges and dropping shade on the south-east
+                 ones, and only then the courtyard / awning / dome / beams on
+                 top. The seam drawn just above survives as the 2px alley
+                 between blocks, so the roofscape reads as separate buildings
+                 rather than as texture on one slab. */
+              var rHash = bhHash(ci + 31, cj + 17);
+              px(c, bx + 2, by + 2, cs - 4, cs - 4,
+                 rHash < 0.30 ? '#77654B' : rHash < 0.62 ? '#6B5B42' : '#5F513B');
+              px(c, bx + 4, by + 4, cs - 8, 3, '#83704F');       // sunlit parapet
+              px(c, bx + 4, by + 4, 3, cs - 8, '#83704F');
+              px(c, bx + 4, by + cs - 10, cs - 8, 5, '#4C4030');  // parapet in shade
+              px(c, bx + cs - 10, by + 4, 5, cs - 8, '#4C4030');
               if (rnd > 0.80) {                            // small dome
                 var dcx = bx + 24 + (rnd * 100 % 24), dcy = by + 24 + (rnd * 313 % 28);
                 c.beginPath(); c.arc(dcx, dcy, 15, 0, Math.PI * 2);
@@ -1262,12 +1557,27 @@
                 c.fillStyle = '#55708C'; c.fill();
                 c.beginPath(); c.arc(dcx, dcy, 4, 0, Math.PI * 2);
                 c.fillStyle = '#C9A648'; c.fill();
-              } else if (rnd < 0.16) {                     // open courtyard
-                px(c, bx + 20, by + 24, 50, 38, '#4E4231');
-                px(c, bx + 20, by + 24, 50, 3, '#877454');
-              } else if (rnd > 0.44 && rnd < 0.52) {       // cloth awning
-                px(c, bx + 26, by + 30, 40, 14, '#9A5B3C');
-                px(c, bx + 26, by + 30, 40, 4, '#B87550');
+              } else if (rnd < 0.16) {                     // courtyard cut into the block
+                px(c, bx + 18, by + 22, 54, 42, '#3F361F');       // the shaft, in shadow
+                px(c, bx + 21, by + 25, 48, 36, '#86734F');       // its floor, in a light well
+                px(c, bx + 21, by + 25, 48, 6, '#5A4B36');        // north wall's shadow
+                px(c, bx + 18, by + 22, 54, 3, '#907C5B');        // the lit lip
+              } else if (rnd > 0.44 && rnd < 0.54) {       // cloth awning over the street
+                px(c, bx + 24, by + 32, 44, 5, '#3F3524');        // what it casts
+                px(c, bx + 24, by + 28, 44, 16, '#A85B36');
+                px(c, bx + 24, by + 28, 44, 4, '#C87A4E');
+                px(c, bx + 33, by + 28, 8, 16, '#E0C49A');        // the cream stripe
+                px(c, bx + 52, by + 28, 8, 16, '#E0C49A');
+              } else if (rnd > 0.62 && rnd < 0.70) {       // exposed roof beams
+                for (var jb = 0; jb < 4; jb++)
+                  px(c, bx + 20, by + 26 + jb * 11, 46, 5, '#8A6C42');
+                px(c, bx + 18, by + 24, 4, 48, '#5E4A2C');
+              } else if (rnd > 0.24 && rnd < 0.31) {       // rubble on a broken roof
+                for (var db = 0; db < 9; db++) {
+                  var d1 = bhHash(ci * 13 + db, cj * 7), d2 = bhHash(cj * 11 + db, ci * 5);
+                  px(c, bx + 18 + d1 * 44, by + 22 + d2 * 44, 4 + (d1 > 0.7 ? 3 : 0), 4,
+                     d2 > 0.5 ? '#7E6C4E' : '#544732');
+                }
               }
             }
           }
@@ -1316,6 +1626,22 @@
            clean kerb around their union — no polygon union maths needed. */
         var WALL = 8;
         var SURF = T.surf;
+        /* Wall THICKNESS, for any map that asks for it. The kerb on its own is
+           a painted outline: it tells you where the floor stops but the walls
+           have no mass. This pass lays the same inflated rect down first,
+           offset south-east by the light direction the roofscape parapets
+           already use, so a dark lip survives on the far side of every kerb
+           and the buildings sit ON the ground instead of being cut out of it.
+           Whole pass runs before ANY kerb, or one room's shadow would fall
+           across its neighbour's wall. Nuke declares no T.shadow and comes out
+           byte-identical to before. */
+        if (T.shadow) {
+          for (i = 0; i < map.rooms.length; i++) {
+            r = map.rooms[i];
+            px(c, sx(r[0]) - WALL + 5, sy(r[1]) - WALL + 6,
+               r[2] * S + WALL * 2, r[3] * S + WALL * 2, T.shadow);
+          }
+        }
         for (i = 0; i < map.rooms.length; i++) {
           r = map.rooms[i];
           // Kerb lighter than the mass: it reads as a low wall catching the sun,
@@ -1337,6 +1663,80 @@
           c.rect(sx(r[0]), sy(r[1]), r[2] * S, r[3] * S);
         }
         c.clip();
+
+        /* ---- GROUND TEXTURE ------------------------------------------------
+           The single biggest reason Dust 2 read as "flat tan rectangles": the
+           surfaces were one flat fill each, and the real map is flagstone,
+           cobble and blown sand. Painted per ROOM, so each surface gets the
+           treatment that belongs to it, and each room clips its own grid —
+           without that, an edge tile of paving spills into the sand room next
+           door and the two surfaces stop being distinguishable at all.
+
+           Every tone here is deliberately inside the same luminance band as
+           the surf[] colour it sits on (measured 141–201 against a structure
+           mass of 92.6), so the texture cannot quietly undo the structure /
+           surface separation the suite asserts.
+
+           Driven by bhHash, NEVER Math.random: this runs at 60fps, and a
+           scatter re-rolled per frame boils. Only the tiles the camera can
+           actually see are stepped, so cost is bounded by the viewport rather
+           than by the size of the map. */
+        if (T.ground === 'sand') {
+          var vx0 = camX - (w / 2) / S, vx1 = camX + (w / 2) / S;
+          var vy0 = me.y - playerY / S, vy1 = me.y + (h - playerY) / S;
+          for (i = 0; i < map.rooms.length; i++) {
+            r = map.rooms[i];
+            var rx0 = Math.max(r[0], vx0), rx1 = Math.min(r[0] + r[2], vx1);
+            var ry0 = Math.max(r[1], vy0), ry1 = Math.min(r[1] + r[3], vy1);
+            if (rx1 <= rx0 || ry1 <= ry0) continue;
+            // 0 sand drift, 1 flagstone, 2 cobble — coarse to fine, which is
+            // also how a real yard, a laid platform and a shaded alley differ.
+            var kind = r[4], pitch = kind === 1 ? 46 : kind === 2 ? 30 : 92;
+            c.save();
+            c.beginPath();
+            c.rect(sx(r[0]), sy(r[1]), r[2] * S, r[3] * S);
+            c.clip();
+            var tI0 = Math.floor(rx0 / pitch), tI1 = Math.floor(rx1 / pitch);
+            var tJ0 = Math.floor(ry0 / pitch), tJ1 = Math.floor(ry1 / pitch);
+            for (var tI = tI0; tI <= tI1; tI++) {
+              for (var tJ = tJ0; tJ <= tJ1; tJ++) {
+                var tH = bhHash(tI + kind * 97, tJ - kind * 53);
+                var gX = sx(tI * pitch), gY = sy(tJ * pitch), gS = pitch * S;
+                if (kind === 1) {
+                  // laid flagstone: three near-tones so no two neighbours
+                  // match, and a seam on TWO edges only — a full grid of seams
+                  // reads as graph paper, not as stone
+                  px(c, gX, gY, gS, gS,
+                     tH < 0.34 ? '#D2BF93' : tH < 0.70 ? '#DCCBA3' : '#CBB88C');
+                  px(c, gX, gY, gS, 2, '#B29F77');
+                  px(c, gX, gY, 2, gS, '#B29F77');
+                  if (tH > 0.94) px(c, gX + gS * 0.34, gY + gS * 0.18, 2, gS * 0.62, '#B29F77');
+                } else if (kind === 2) {
+                  // cobble in the shade, mortar showing between the stones
+                  px(c, gX + 1, gY + 1, gS - 2, gS - 2, tH < 0.5 ? '#B0966C' : '#A68D64');
+                  px(c, gX + 1, gY + 1, gS - 2, 2, '#B79D71');
+                } else {
+                  /* Blown sand. The broad patch comes FIRST and covers most of
+                     the cell: measured on the finished frame, drifts alone left
+                     the raw surf[0] fill holding 34% of the screen as one flat
+                     tone, which is the exact "flat tan rectangle" the owner
+                     called out. The patch breaks that field up; the drift and
+                     the grit are the detail on top of it. */
+                  px(c, gX, gY, gS * 0.86, gS * 0.9,
+                     tH < 0.33 ? '#C8AC7E' : tH < 0.66 ? '#BFA375' : '#CBB083');
+                  var dX = gX + gS * bhHash(tJ, tI) * 0.42;
+                  var dY = gY + gS * bhHash(tI + 7, tJ + 3) * 0.70;
+                  px(c, dX, dY, gS * (0.46 + tH * 0.46), gS * (0.11 + tH * 0.15),
+                     tH > 0.5 ? '#CFB489' : '#BCA073');
+                  px(c, dX, dY, gS * (0.46 + tH * 0.46), 2, '#D9C099');
+                  px(c, gX + gS * bhHash(tI * 3, tJ * 5), gY + gS * bhHash(tJ * 3, tI * 5),
+                     3, 3, '#AE9668');
+                }
+              }
+            }
+            c.restore();
+          }
+        }
 
         // ---- ground props ----
         for (i = 0; i < map.props.length; i++) {
@@ -1415,13 +1815,52 @@
             px(c, ax + 2, ay + 2, aw - 4, 4, '#A2A49E');
             for (var pl = 8; pl < aw - 4; pl += 12) px(c, ax + pl, ay + 3, 3, ah - 7, '#767871');
           } else if (P.t === 'rubble') {                    // loose stone scatter
-            for (var rr = 0; rr < 14; rr++) {
+            for (var rr = 0; rr < 18; rr++) {
               var h1 = bhHash(P.x + rr * 7, P.y + rr * 13);
               var h2 = bhHash(P.y + rr * 5, P.x + rr * 11);
-              var rw = 3 + Math.floor(h1 * 5);
+              var rw = 3 + Math.floor(h1 * 6);
+              // A third tone, and a 1px dark side on the bigger pieces: a
+              // two-tone scatter of identical squares reads as static.
+              px(c, ax + h1 * (aw - rw), ay + h2 * (ah - rw) + 1, rw, rw, '#6E5C3E');
               px(c, ax + h1 * (aw - rw), ay + h2 * (ah - rw), rw, rw,
-                 h2 > 0.5 ? '#9A8256' : '#B09B70');
+                 h2 > 0.66 ? '#C0AB80' : h2 > 0.33 ? '#A98F62' : '#8C7750');
             }
+          } else if (P.t === 'arch') {
+            /* A doorway punched through a wall, seen from directly above: the
+               dark throat of the opening, a stone jamb either side of it, and
+               the threshold you would step over. Clipped to the floor union
+               like every prop, so only the part standing inside the room
+               survives — which is exactly the part this camera can see. */
+            px(c, ax, ay, aw, ah, '#4A3D2B');               // the opening
+            px(c, ax, ay, aw, 4, '#33291C');                // its far lip, in shadow
+            px(c, ax, ay + ah - 6, aw, 6, '#6E5F44');       // the threshold stone
+            px(c, ax, ay, 11, ah, '#C4AC7C');               // sunlit jamb
+            px(c, ax, ay, 11, 4, '#DCC79A');
+            px(c, ax + aw - 11, ay, 11, ah, '#9A855C');     // shaded jamb
+          } else if (P.t === 'awning') {
+            /* Cloth stretched over a doorway, striped the way the map's own
+               are. The cast shadow underneath is what stops it looking like a
+               sticker lying flat on the sand. */
+            px(c, ax + 5, ay + ah - 3, aw - 6, 11, '#7A6845');
+            px(c, ax, ay, aw, ah, '#7E3E28');               // the shaded underside
+            px(c, ax, ay, aw, ah - 7, '#C06A42');
+            for (var awS = 4; awS < aw - 8; awS += 15) px(c, ax + awS, ay, 7, ah - 7, '#E0C49A');
+            px(c, ax, ay, aw, 4, '#D88A5E');                // the lit ridge
+            for (var awD = 4; awD < aw - 8; awD += 15) px(c, ax + awD, ay + ah - 7, 7, 7, '#5E3020');
+          } else if (P.t === 'steps') {
+            /* Shallow stone steps. Five treads with a lit nosing on each —
+               the nosings are the whole read at this scale, since from
+               straight above a step is otherwise indistinguishable from a
+               painted line. */
+            var stN = 5, stH = ah / stN;
+            for (var stI = 0; stI < stN; stI++) {
+              var stY = ay + stI * stH;
+              px(c, ax, stY, aw, stH, stI % 2 ? '#CDBA8E' : '#D8C69C');
+              px(c, ax, stY, aw, 3, '#EFE0BC');             // nosing, catching the sun
+              px(c, ax, stY + stH - 4, aw, 4, '#9E8A64');   // riser, in its own shade
+            }
+            px(c, ax, ay, 4, ah, '#8E7A54');                // the open ends
+            px(c, ax + aw - 4, ay, 4, ah, '#8E7A54');
           }
         }
 
