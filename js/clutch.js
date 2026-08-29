@@ -74,6 +74,41 @@
    The tell, the peek and the hitbox all read ANGLE_DEFS — ONE array. A
    second copy is how a tell ends up describing a different angle from the
    one that opens (the exact failure mode the spec calls out in §5.4).
+
+   ---------------------------------------------------------------------------
+   V23b — THE THREE THINGS THE OWNER ASKED FOR AFTER PLAYING IT
+
+   1. A BRIEFING ON THE FIRST LAN. Nothing in the game teaches the positional
+      tap; §5.1 exists precisely because this verb is not one of the other
+      three, so it is the one verb a player cannot arrive already knowing.
+      Shown once ever, before round 1, gated on State.tutorialSeen('first_lan')
+      and latched on DISMISS (never on show — a reload mid-briefing would
+      otherwise burn the only time it ever fires). 'first_lan' is a
+      d.tutorialsSeen SAVE KEY: it round-trips through normalizeSave() for
+      free and must never be renamed.
+
+   2. A ROUND CARD YOU TAP THROUGH. Rounds used to auto-advance on a 950ms
+      timer while a CSS banner faded — the result was gone before it was read
+      and the next round started under the player's thumb. Now every round
+      ends on a card that states the result, shows the running score out of
+      roundResults, and waits. The player sets the pace, which is the point.
+
+      THE STRAY TAP is the real hazard here: the tap that kills the last
+      attacker is a pointerdown a few hundred ms before the card exists, and a
+      player mid-burst will keep tapping. The card therefore refuses input for
+      CARD_LOCK_MS and only draws its TAP bar once it will actually accept
+      one — the affordance and the gate are the same fact, so the card never
+      invites a tap it is going to swallow.
+
+   3. THE FIVE ANGLES ARE MARKED. They were only ever implied by the
+      architecture, which is fine on the tenth LAN and unreadable on the
+      first. drawAngleMarkers() brackets each gap, and it iterates ANGLE_DEFS
+      directly — there is no second list of marker positions, because a second
+      list is how a marker ends up on a different angle from the one that
+      opens (§5.4 again, same rule as the tell). The brackets are loudest at
+      the top of a round and settle back to a whisper once play begins, and
+      the named angle's own bracket lifts during the tell, so the footstep
+      call becomes a PLACE rather than a word a new player cannot site.
    ========================================================================== */
 (function (G) {
   'use strict';
@@ -88,12 +123,49 @@
   var ROUNDS_TO_WIN = 2;    // best of 3
   var ANGLE_COUNT  = 5;
 
-  // Pacing beats that are NOT in the spec's constant list because they carry
-  // no gameplay stakes — they only give the fixed banners ("ROUND WON" etc.)
-  // a beat to be read before the next thing starts, the same job WIN_HOLD_MS
-  // does in js/matchgames.js.
-  var ROUND_PAUSE_MS = 950;
-  var MATCH_END_HOLD_MS = 950;
+  /* ROUND_PAUSE_MS (950) and MATCH_END_HOLD_MS (950) used to live here. Both
+     are DELETED, not renamed: they were auto-advance timers, and after V23b
+     nothing about the round beat advances on a clock — the player taps it
+     forward. Leaving a constant called "pause" that no longer pauses anything
+     is worse than either changing it or removing it.
+
+     What stands in their place is not a pause but an INPUT LOCK. The card is
+     up from the instant the round resolves and is readable immediately; it
+     simply will not accept a tap for its first CARD_LOCK_MS, which is what
+     stops the kill tap from also dismissing it. 350ms is comfortably longer
+     than a double-tap interval and far shorter than the time it takes to read
+     "ROUND WON", so the gate is invisible to anyone who is not spamming. */
+  var CARD_LOCK_MS = 350;
+
+  // Entrance and settle timings for the card and the angle brackets. Neither
+  // gates input or gameplay — both are read straight off the wall clock while
+  // drawing, so a dropped frame changes nothing but smoothness.
+  var CARD_IN_MS   = 170;   // the card's ease-out entrance
+  var TAP_IN_MS    = 140;   // the TAP bar's fade, once CARD_LOCK_MS has passed
+  var MARK_INTRO_MS = 1400; // angle brackets: loud at round start, then settle
+
+  /* THE FIRST-LAN LATCH. 'first_lan' is a per-entry key on d.tutorialsSeen,
+     which defaultData() already ships and normalizeSave() already round-trips,
+     so this costs js/state.js exactly nothing and adds no second "have they
+     seen it" flag anywhere. IT IS A SAVE KEY AND MUST NEVER BE RENAMED — the
+     three ids this project already carries under wrong-but-frozen names
+     (stream_minutes, lucky_mousepad, phone_unlock) are what renaming one
+     costs.
+
+     Wrapped exactly the way js/stream.js wraps 'first_stream', for the same
+     reason: js/clutch.js is loadable without js/state.js (test-v23-quests.js
+     does precisely that), so a missing State must degrade to "once per
+     session" rather than throw inside run(). */
+  var FIRST_LAN_TUTORIAL = 'first_lan';
+  var localSeen = {};
+  function tutorialSeenSafe(id) {
+    if (G.State && typeof G.State.tutorialSeen === 'function') return !!G.State.tutorialSeen(id);
+    return !!localSeen[id];
+  }
+  function markTutorialSeenSafe(id) {
+    localSeen[id] = true;   // set FIRST, so a throwing State still latches the session
+    if (G.State && typeof G.State.markTutorialSeen === 'function') G.State.markTutorialSeen(id);
+  }
 
   function now() { return Date.now(); }
   function beep(k) { if (G.UI && G.UI.beep) G.UI.beep(k); }
@@ -205,7 +277,7 @@
   }
 
   /* ---------------------------------------------------------------------- shell */
-  var root = null, canvas = null, ctx = null, labelEl = null, bannerEl = null;
+  var root = null, canvas = null, ctx = null, labelEl = null;
   var rafId = null;
   var W = 0, H = 0;
   var active = false;
@@ -221,17 +293,22 @@
     // touches" (SPEC-V23-QUESTS.md §2 ownership table has no css/clutch.css).
     root.className = 'mg-match';
     root.id = 'clutch-overlay';
+    /* No .mg-match__banner here any more. Every fixed message this game shows
+       — the briefing, ROUND WON/LOST, CLUTCHED/LAN LOST — is now a card the
+       player taps through, and a card has to be TAPPABLE: .mg-match__banner
+       is `pointer-events: none` and sits outside the canvas, so a DOM banner
+       could never own the tap that dismisses it. Drawing the card on the
+       canvas puts the message and the tap surface in the same place, and the
+       one pointerdown listener below already covers the whole of it. */
     root.innerHTML =
       '<div class="mg-match__label" id="clutch-label">THE CLUTCH — MIRAGE MID</div>' +
-      '<canvas class="mg-match__canvas" id="clutch-canvas"></canvas>' +
-      '<div class="mg-match__banner" id="clutch-banner"></div>';
+      '<canvas class="mg-match__canvas" id="clutch-canvas"></canvas>';
     var host = document.getElementById('app') || document.body;
     host.appendChild(root);
 
     canvas = document.getElementById('clutch-canvas');
     ctx = canvas.getContext('2d');
     labelEl = document.getElementById('clutch-label');
-    bannerEl = document.getElementById('clutch-banner');
 
     canvas.addEventListener('pointerdown', function (e) {
       e.preventDefault();
@@ -259,11 +336,6 @@
     ctx.imageSmoothingEnabled = false;
   }
 
-  function setBanner(text, kind) {
-    bannerEl.textContent = text || '';
-    bannerEl.className = 'mg-match__banner' + (text ? ' mg-match__banner--show' : '') +
-      (kind ? ' mg-match__banner--' + kind : '');
-  }
 
   /* -------------------------------------------------------------- draw helpers */
   function px(c, x, y, w, h, col) { c.fillStyle = col; c.fillRect(x | 0, y | 0, Math.ceil(w), Math.ceil(h)); }
@@ -293,7 +365,13 @@
   var lastAngleIdx = -1;
   var angleIdx = -1;
 
-  // state: 'tell' | 'peek' | 'flicking' | 'bolt' | 'dead' | 'roundPause' | 'matchEnd'
+  /* state: 'tell' | 'peek' | 'flicking' | 'bolt' | 'dead'
+            | 'briefing'  — the first-LAN card, before round 1 ever starts
+            | 'roundCard' — ROUND WON/LOST + the score, waiting for a tap
+            | 'matchCard' — CLUTCHED/LAN LOST, waiting for the tap that
+                            closes the overlay and fires done(won)
+     The last three are the tap-gated ones: nothing about them is on a timer,
+     so update() has nothing to do in any of them. */
   var state = 'tell';
   var tellEnd = 0;
   var peekStart = 0, exposeEnd = 0;
@@ -301,9 +379,14 @@
   var flickFrom = null, flickTo = null, flickStart = 0, flickEnd = 0;
   var boltStart = 0, boltEnd = 0, boltRoundWon = false;
   var deathStart = 0, deathEnd = 0;
-  var pauseEnd = 0;
   var killfeedUntil = 0, muzzleFlashUntil = 0;
   var boltThrowT = 0;                            // live, for the bolt-handle animation
+  var cardOpenAt = 0;        // wall clock the current card appeared; drives BOTH
+                             // its entrance and its CARD_LOCK_MS input gate
+  var matchWon = false;      // what the match card is reporting, and what the
+                             // tap that dismisses it will pass to done()
+  var roundStartAt = 0;      // when the current round began — the angle
+                             // brackets' intro reads off this, nothing else
 
   function resetMatch(opts) {
     enemiesPerRound = (opts && opts.enemies) || 3;
@@ -312,15 +395,31 @@
     roundResults = [];
     lastAngleIdx = -1;
     killfeedUntil = 0; muzzleFlashUntil = 0;
+    aimX = W / 2; aimY = H / 2;
+    roundStartAt = now();
+    // The briefing is checked ONCE, here, and only ever gates round 1 — a
+    // player who has seen it drops straight into the first tell with no extra
+    // beat, exactly as before.
+    if (!tutorialSeenSafe(FIRST_LAN_TUTORIAL)) { openCard('briefing'); return; }
     startRound();
   }
 
   function startRound() {
     attackersRemaining = enemiesPerRound;
     aimX = W / 2; aimY = H / 2;
-    setBanner('');
+    roundStartAt = now();
     spawnAttacker();
   }
+
+  // Every card enters through here, so the lock clock and the entrance clock
+  // can never disagree about when this card appeared.
+  function openCard(kind) {
+    state = kind;
+    cardOpenAt = now();
+  }
+  // The gate itself. One comparison against the wall clock — see the
+  // CARD_LOCK_MS note above for why a time lock and not a pointer-up latch.
+  function cardArmed() { return now() - cardOpenAt >= CARD_LOCK_MS; }
 
   function spawnAttacker() {
     angleIdx = pickAngle(lastAngleIdx);
@@ -331,6 +430,33 @@
 
   function onTap(p) {
     if (!active) return;
+    /* THE CARD STATES COME FIRST, and every one of them is gated on
+       cardArmed(). The tap that killed the last attacker resolves into a card
+       ~1s later (the bolt cycle), but a player mid-burst is still tapping, and
+       without this gate the round result would flash past unread — which is
+       the exact complaint the card exists to answer. */
+    if (state === 'briefing') {
+      if (!cardArmed()) return;
+      // LATCH ON DISMISS, never on show: mark it here and a player who
+      // reloads while reading still gets the briefing next time.
+      markTutorialSeenSafe(FIRST_LAN_TUTORIAL);
+      beep('click');
+      startRound();
+      return;
+    }
+    if (state === 'roundCard') {
+      if (!cardArmed()) return;
+      beep('click');
+      currentRound++;
+      startRound();
+      return;
+    }
+    if (state === 'matchCard') {
+      if (!cardArmed()) return;
+      beep('click');
+      finish(matchWon);
+      return;
+    }
     if (state === 'tell') {
       // "You may re-aim during it" (spec §5.3.1) — a free, instant
       // reposition. No flick timer, no bolt, no consequence: this is
@@ -386,34 +512,42 @@
   function onRoundWon() {
     roundResults.push(true);
     roundsWon++;
-    setBanner('ROUND WON', 'good');
-    beep('cash');
+    // endMatch() sounds the LAN's own beat, so the round beep is skipped when
+    // this round is also the match — one card, one sound.
     if (roundsWon >= ROUNDS_TO_WIN) { endMatch(true); return; }
-    pauseEnd = now() + ROUND_PAUSE_MS;
-    state = 'roundPause';
+    beep('cash');
+    openCard('roundCard');
   }
 
   function onRoundLost() {
     roundResults.push(false);
     roundsLost++;
-    setBanner('ROUND LOST', 'bad');
-    beep('miss');
     if (roundsLost >= ROUNDS_TO_WIN) { endMatch(false); return; }
-    pauseEnd = now() + ROUND_PAUSE_MS;
-    state = 'roundPause';
+    beep('miss');
+    openCard('roundCard');
   }
 
+  /* seamSkipsCard — set ONLY by __win/__fail, cleared the instant endMatch
+     reads it. Those two seams must still reach done(), because js/email.js's
+     whole accept -> play -> resolveInvite chain hangs off that callback and
+     the suite drives it through them; a tap gate they cannot get past would
+     turn a passing check into a hang. They still run the REAL endMatch() —
+     the flag skips the card, not the code under test. It is deliberately not
+     an argument to endMatch(): the test asserts the literal `endMatch(true)`
+     / `endMatch(false)` call shape, and a second parameter would break it. */
+  var seamSkipsCard = false;
+
   function endMatch(won) {
-    state = 'matchEnd';
-    setBanner(won ? 'CLUTCHED' : 'LAN LOST', won ? 'good' : 'bad');
-    setTimeout(function () { finish(won); }, MATCH_END_HOLD_MS);
+    matchWon = !!won;
+    if (seamSkipsCard) { seamSkipsCard = false; finish(won); return; }
+    beep(won ? 'cash' : 'miss');
+    openCard('matchCard');
   }
 
   function finish(won) {
     active = false;
     if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     if (root) root.classList.remove('mg-match--open');
-    setBanner('');
     var cb = onDone; onDone = null;
     // Same 160ms stagger js/matchgames.js's finish() uses — let the close
     // transition start before whatever reward UI email.js/state.js shows
@@ -435,10 +569,10 @@
       }
     } else if (state === 'dead') {
       if (t >= deathEnd) { onRoundLost(); }
-    } else if (state === 'roundPause') {
-      if (t >= pauseEnd) { currentRound++; startRound(); }
     }
-    // 'matchEnd' is driven by the setTimeout in endMatch(); nothing to tick.
+    /* 'briefing', 'roundCard' and 'matchCard' tick nothing at all — they end
+       on a tap and only on a tap. That is the whole change: there is no timer
+       left in this function that can advance the match past the player. */
   }
 
   /* ======================================================================
@@ -899,6 +1033,81 @@
     px(c, dir > 0 ? x + jw - 3 : x, y, 3, jh, '#2B2015');
   }
 
+  /* ======================================================================
+     THE ANGLE MARKERS (owner: "it needs to be obvious where the enemies can
+     peek"). Five corner brackets, one per entry in ANGLE_DEFS, iterated
+     straight off that array — there is deliberately no list of marker
+     positions anywhere in this file, because a second list is how a marker
+     ends up bracketing a gap that is not the one that opens.
+
+     WHY BRACKETS AND NOT A FILL OR AN OUTLINE. A closed outline reads as a
+     hitbox and turns five pieces of architecture into five buttons; a tinted
+     fill fights GAP_SHADOW, which is the one thing every peek is read
+     against. Corners state the extent of a slice and leave its middle — where
+     the silhouette actually appears — completely untouched.
+
+     WHY EACH BRACKET IS TWO-TONE. The cover beside these five gaps ranges
+     from teal render at luma 78 to white plaster at 201, so no single colour
+     can read against all five. Each arm is therefore a bone segment just
+     INSIDE the gap (against GAP_SHADOW, the darkest thing in the scene) with
+     a near-black segment just OUTSIDE it (against the lit cover). Lit against
+     unlit, in both directions at once — the same trick the gaps themselves
+     use, and the reason this holds on plaster and on rusted steel alike.
+
+     LOUD, THEN QUIET. At full strength the brackets would compete with the
+     peek itself, which is unacceptable — the silhouette must always be the
+     loudest thing on screen. So they open a round at 0.92 alpha and ease down
+     to 0.30 over MARK_INTRO_MS, which is the one authored motion moment in
+     the scene: the frame you get for orienting yourself, spent as you start
+     playing. The only lift after that is the ACTIVE angle's own bracket
+     during the tell, and that is not competition — it is the tell. "ARCHWAY"
+     is a word a first-timer cannot site; the bracket is what makes it a
+     place. It drops back to base the instant the enemy is exposed, so nothing
+     is glowing while the shot is live. */
+  var MARK_LIT = '#E8E2D0', MARK_DARK = '#100C08';
+
+  function drawAngleMarkers(c, w, h) {
+    var t = now();
+    // Briefing: hold them at full, because the card is explaining exactly
+    // this and the player is reading, not shooting.
+    var intro = state === 'briefing' ? 0 : clamp((t - roundStartAt) / MARK_INTRO_MS, 0, 1);
+    var ease = 1 - Math.pow(1 - intro, 3);          // ease-out, never linear
+    var base = lerp(0.92, 0.30, ease);
+    var grow = lerp(5, 0, ease);                    // brackets settle inward
+    for (var i = 0; i < ANGLE_DEFS.length; i++) {
+      var a = base;
+      if (state === 'tell' && i === angleIdx) {
+        // ~3Hz, and it is a lift on top of base rather than a replacement, so
+        // the tell never reads DIMMER than the four angles it is not naming.
+        a = Math.max(a, 0.62 + 0.28 * (0.5 + 0.5 * Math.sin(t / 160)));
+      }
+      drawBracket(c, angleRectPx(ANGLE_DEFS[i], w, h), a, grow);
+    }
+  }
+
+  // One gap's four corners. Arm length scales off the rect's short side, so
+  // the far ARCHWAY gets a smaller bracket than the near SHORT WALL for free
+  // and the markers inherit the scene's size falloff instead of flattening it.
+  function drawBracket(c, r, alpha, grow) {
+    var x0 = r.x - grow, y0 = r.y - grow;
+    var x1 = r.x + r.w + grow, y1 = r.y + r.h + grow;
+    var L = clamp(Math.min(r.w, r.h) * 0.34, 7, 26);
+    c.save();
+    c.globalAlpha = clamp(alpha, 0, 1);
+    // the dark half, one step further out — this is what carries the bracket
+    // across the pale plaster of the A wall and the cream of the back wall
+    corner(c, x0 - 2, y0 - 2, x1 + 2, y1 + 2, L, MARK_DARK);
+    corner(c, x0, y0, x1, y1, L, MARK_LIT);
+    c.restore();
+  }
+
+  function corner(c, x0, y0, x1, y1, L, col) {
+    px(c, x0, y0, L, 2, col);        px(c, x0, y0, 2, L, col);          // top-left
+    px(c, x1 - L, y0, L, 2, col);    px(c, x1 - 2, y0, 2, L, col);      // top-right
+    px(c, x0, y1 - 2, L, 2, col);    px(c, x0, y1 - L, 2, L, col);      // bottom-left
+    px(c, x1 - L, y1 - 2, L, 2, col); px(c, x1 - 2, y1 - L, 2, L, col); // bottom-right
+  }
+
   // The peeking attacker, drawn inside the exposed angle's gap only. Same
   // silhouette vocabulary as js/matchgames.js's makeAwp() CT — this game's
   // camera is deliberately the same "you, looking down your gun" language.
@@ -1005,15 +1214,23 @@
   // onRoundWon/onRoundLost above), so the pip strip cannot show an outcome
   // before its banner does — the exact leak js/tournaments.js shipped once
   // (V22 item 10, HANDOFF-V2 §5.9-adjacent).
-  function drawHud(c, w, h) {
-    var i, pw = 20, ph = 10, gap = 6;
-    var totalW = pw * 3 + gap * 2;
-    var px0 = w / 2 - totalW / 2, py0 = 10;
+  /* The pip strip, centred on cx. Both the HUD and the round card call THIS —
+     the card does not re-derive a second reading of roundResults, for exactly
+     the reason the pips exist to guard: two readers of one tally is how one of
+     them ends up showing a result the other has not shown yet. */
+  var PIP_WON = '#7FE3B0', PIP_LOST = '#C0483C', PIP_EMPTY = '#3A3F4A';
+  function drawPips(c, cx, y, pw, ph) {
+    var gap = 6, i;
+    var x0 = cx - (pw * 3 + gap * 2) / 2;
     for (i = 0; i < 3; i++) {
-      var col = i < roundResults.length ? (roundResults[i] ? '#7FE3B0' : '#C0483C') : '#3A3F4A';
-      px(c, px0 + i * (pw + gap), py0, pw, ph, '#000000');
-      px(c, px0 + i * (pw + gap) + 1, py0 + 1, pw - 2, ph - 2, col);
+      var col = i < roundResults.length ? (roundResults[i] ? PIP_WON : PIP_LOST) : PIP_EMPTY;
+      px(c, x0 + i * (pw + gap), y, pw, ph, '#000000');
+      px(c, x0 + i * (pw + gap) + 1, y + 1, pw - 2, ph - 2, col);
     }
+  }
+
+  function drawHud(c, w, h) {
+    drawPips(c, w / 2, 10, 20, 10);
     var awLabel = 'ATTACKERS LEFT ' + Math.max(0, attackersRemaining);
     px(c, w - 8 - awLabel.length * 6.4, 8, awLabel.length * 6.4 + 6, 16, 'rgba(10,10,10,0.55)');
     pixelText(c, awLabel, w - 10, 16, 10, '#E8E2D0', 'right');
@@ -1032,6 +1249,173 @@
     }
   }
 
+  /* ======================================================================
+     THE CARDS — the briefing, the round result, the LAN result.
+
+     One piece of chrome does all three, because they are one thing: a beat
+     the game stops on until the player taps. Broadcast register rather than
+     Mirage's warm sandstone — this is the UI talking, not the map, and the
+     literals below are the app's own tokens (--panel #233863, --panel-lo
+     #1B284A, --outline #0b0e1c, --bevel-hi/--bevel-lo, --cash, --danger,
+     --ink) so the card belongs to the same world as every other panel in the
+     game. Canvas cannot read CSS variables, which is why they are literals
+     here for the same reason the map's palette is — if tokens.css moves one
+     of these, this list moves with it.
+
+     Anatomy, top to bottom: a 5px result-coloured bar, a recessed header band
+     carrying the one word that matters, the running score, the pip strip
+     (the SAME drawPips() the HUD uses), and the tap bar.
+
+     THE TAP BAR IS THE GATE MADE VISIBLE. It fades in only once CARD_LOCK_MS
+     has elapsed, so the card never shows an affordance it is about to ignore
+     — a button that is drawn and dead is worse than the stray tap it was
+     guarding against. The whole canvas is the tap target, not just the bar;
+     the bar says what a tap will do. */
+  var C_PANEL = '#233863', C_PANEL_LO = '#1B284A', C_PANEL_HI = '#38447f';
+  var C_OUTLINE = '#0b0e1c', C_BEV_HI = '#6675c4', C_BEV_LO = '#151b3c';
+  var C_INK = '#eaf0ff', C_INK_DIM = '#c2cbee', C_INK_HEAD = '#FFFFFF';
+  var C_GOOD = '#3ddc84', C_BAD = '#ff4b4b', C_GOLD = '#ffc93c';
+
+  // The briefing, in the game's voice and no longer than it has to be. It
+  // teaches the three things nothing else in the game can: the verb, the
+  // tell, and why a miss costs a round.
+  var BRIEF_LEAD = 'You are the AWPer. This site is yours to hold.';
+  var BRIEF_RULES = [
+    'TAP where you want to shoot — the AWP flicks there, scopes and fires.',
+    'Footsteps name the angle a moment before it opens. Re-aim while you hear them.',
+    'After every shot the bolt cycles for over a second and nothing peeks. A miss is usually the round.'
+  ];
+  var BRIEF_TAIL = 'Best of three rounds. Win two.';
+
+  // Greedy word wrap against the real measured advance, not a characters-per-
+  // line guess — the body copy is the one place in this file where a wrong
+  // guess would push text through the panel's edge.
+  function wrapText(c, text, size, maxW) {
+    c.font = '700 ' + size + 'px ui-monospace, Menlo, Consolas, monospace';
+    var words = text.split(' '), out = [], line = '';
+    for (var i = 0; i < words.length; i++) {
+      var next = line ? line + ' ' + words[i] : words[i];
+      if (line && c.measureText(next).width > maxW) { out.push(line); line = words[i]; }
+      else line = next;
+    }
+    if (line) out.push(line);
+    return out;
+  }
+
+  // The score the owner asked for, derived from roundResults and nothing
+  // else. roundsWon/roundsLost exist for the ROUNDS_TO_WIN threshold; adding
+  // a third reading of the same tally is how two of them drift apart.
+  function scoreLine() {
+    var won = 0, lost = 0;
+    for (var i = 0; i < roundResults.length; i++) { if (roundResults[i]) won++; else lost++; }
+    return 'YOU ' + won + ' — ' + lost + ' THEM';
+  }
+
+  function easeOut(t) { return 1 - Math.pow(1 - clamp(t, 0, 1), 3); }
+
+  function drawCard(c, w, h) {
+    if (state !== 'briefing' && state !== 'roundCard' && state !== 'matchCard') return;
+    var t = now();
+    var e = easeOut((t - cardOpenAt) / CARD_IN_MS);
+
+    // The scrim rises with the card rather than snapping — the scene stays
+    // legible underneath, so the player keeps their bearings on the site.
+    px(c, 0, 0, w, h, 'rgba(10,8,6,' + (0.80 * e).toFixed(3) + ')');
+
+    var u = clamp(w / 420, 0.85, 2);
+    var x0 = Math.round(26 * u), x1 = w - Math.round(26 * u), pw2 = x1 - x0;
+    var inner = Math.round(16 * u);
+    var textW = pw2 - inner * 2;
+    var tapH = Math.max(46, Math.round(46 * u));   // 44px floor, with room to spare
+    var briefing = state === 'briefing';
+    var won = briefing ? false : (state === 'matchCard' ? matchWon
+                                 : roundResults[roundResults.length - 1] === true);
+    var accent = briefing ? C_GOLD : (won ? C_GOOD : C_BAD);
+
+    // ---- measure, then place. Everything below is laid out from the content
+    // out, so a longer briefing line grows the panel instead of overflowing it.
+    var accentH = 5;
+    var headH = Math.round((briefing ? 34 : 52) * u);
+    var lead = [], rules = [], tailRows = [], bodyH = 0, i, j;
+    if (briefing) {
+      lead = wrapText(c, BRIEF_LEAD, 12, textW);
+      for (i = 0; i < BRIEF_RULES.length; i++) {
+        rules.push(wrapText(c, BRIEF_RULES[i], 11.5, textW - Math.round(14 * u)));
+      }
+      tailRows = wrapText(c, BRIEF_TAIL, 12, textW);
+      bodyH = 14 + lead.length * 17 + 12;
+      for (i = 0; i < rules.length; i++) bodyH += rules[i].length * 16 + 10;
+      bodyH += 4 + tailRows.length * 17;
+    } else {
+      bodyH = 18 + 18 + 14 + 14;                   // score row, gap, pips, gap
+    }
+    var panelH = accentH + headH + bodyH + 14 + tapH + inner;
+    var y0 = Math.round((h - panelH) / 2) + Math.round((1 - e) * 14);
+
+    c.save();
+    c.globalAlpha = e;
+
+    // ---- the panel: 2px outline, then the face, then a real bevel (a light
+    // inner top edge and a dark inner bottom one), per ART-DIRECTION §2.1/2.4.
+    px(c, x0 - 2, y0 - 2, pw2 + 4, panelH + 4, C_OUTLINE);
+    px(c, x0, y0, pw2, panelH, C_PANEL);
+    px(c, x0, y0, pw2, accentH, accent);                       // the result bar
+    px(c, x0, y0 + accentH, pw2, 2, C_BEV_HI);
+    px(c, x0, y0 + panelH - 2, pw2, 2, C_BEV_LO);
+
+    // ---- header band, recessed, carrying the one word that matters
+    var hy = y0 + accentH + 2;
+    px(c, x0, hy, pw2, headH, C_PANEL_LO);
+    px(c, x0, hy + headH, pw2, 2, C_OUTLINE);
+    var title = briefing ? 'YOUR FIRST LAN'
+              : state === 'matchCard' ? (won ? 'CLUTCHED' : 'LAN LOST')
+              : (won ? 'ROUND WON' : 'ROUND LOST');
+    pixelText(c, title, x0 + pw2 / 2, hy + headH / 2,
+              Math.round((briefing ? 15 : 26) * u),
+              briefing ? C_INK_HEAD : accent, 'center');
+
+    var y = hy + headH + 2;
+    if (briefing) {
+      y += 14;
+      for (i = 0; i < lead.length; i++) { pixelText(c, lead[i], x0 + inner, y + 8, 12, C_INK); y += 17; }
+      y += 12;
+      // A drawn 3px gold tick per rule — an authored mark, not a bullet glyph
+      // (ART-DIRECTION §2.5: nothing Unicode does icon duty in this game).
+      for (i = 0; i < rules.length; i++) {
+        px(c, x0 + inner, y + 4, 3, rules[i].length * 16 - 6, C_GOLD);
+        for (j = 0; j < rules[i].length; j++) {
+          pixelText(c, rules[i][j], x0 + inner + Math.round(14 * u), y + 8, 11.5, C_INK);
+          y += 16;
+        }
+        y += 10;
+      }
+      y += 4;
+      for (i = 0; i < tailRows.length; i++) { pixelText(c, tailRows[i], x0 + inner, y + 8, 12, C_INK_DIM); y += 17; }
+    } else {
+      y += 18;
+      pixelText(c, scoreLine(), x0 + pw2 / 2, y, Math.round(15 * u), C_INK, 'center');
+      y += 18;
+      drawPips(c, x0 + pw2 / 2, y, Math.round(26 * u), 12);
+      y += 14 + 14;
+    }
+
+    // ---- the tap bar, and only once the gate is open
+    var tapA = easeOut((t - cardOpenAt - CARD_LOCK_MS) / TAP_IN_MS);
+    if (tapA > 0) {
+      var ty = y0 + panelH - inner - tapH;
+      c.globalAlpha = e * tapA;
+      px(c, x0 + inner - 2, ty - 2, textW + 4, tapH + 4, C_OUTLINE);
+      px(c, x0 + inner, ty, textW, tapH, C_PANEL_HI);
+      px(c, x0 + inner, ty, textW, 2, C_BEV_HI);
+      px(c, x0 + inner, ty + tapH - 2, textW, 2, C_BEV_LO);
+      var tapLabel = briefing ? 'TAP TO HOLD THE ANGLE'
+                   : state === 'matchCard' ? 'TAP TO CONTINUE'
+                   : 'TAP FOR ROUND ' + (currentRound + 1);
+      pixelText(c, tapLabel, x0 + pw2 / 2, ty + tapH / 2, Math.round(12 * u), C_INK_HEAD, 'center');
+    }
+    c.restore();
+  }
+
   function draw(c, w, h) {
     // Bolt-handle throw: a triangle wave over the bolt cycle's own duration
     // (out on the first half, back on the second), computed fresh from
@@ -1047,6 +1431,12 @@
     // the low wall's cap and the front barrel row are painted AFTER the
     // silhouette, so a peeker is cut off by the cover it is peeking from.
     drawSceneBack(c, w, h);
+    // The brackets go INSIDE the sandwich, not on top of it: painted after
+    // the back scene but before the enemy and the front scene, so the low
+    // wall's cap and the front barrel row cut across them exactly as they cut
+    // across a peeker. A marker floating over the cover it belongs behind is
+    // the thing that would make these read as UI stuck onto the map.
+    drawAngleMarkers(c, w, h);
     drawEnemy(c, w, h);
     drawSceneFront(c, w, h);
     if (state !== 'flicking') drawReticle(c);
@@ -1057,6 +1447,7 @@
       px(c, 0, 0, w, h, 'rgba(200,20,20,' + (0.55 * dt2).toFixed(2) + ')');
     }
     drawHud(c, w, h);
+    drawCard(c, w, h);      // last: the card is the only thing that outranks the gun
   }
 
   function loop() {
@@ -1118,11 +1509,18 @@
        js/email.js untestable end to end, which is precisely the chain §1
        says must never be quietly rewired.
 
-       These drive the REAL endMatch(), so the done() callback, the banner and
-       the teardown all run exactly as they do in play. They do not shortcut
-       to the callback, because a seam that bypasses the code under test
-       proves nothing. */
-    __win: function () { if (!active) return false; endMatch(true); return true; },
-    __fail: function () { if (!active) return false; endMatch(false); return true; }
+       These drive the REAL endMatch(), so the done() callback and the teardown
+       all run exactly as they do in play. They do not shortcut to the
+       callback, because a seam that bypasses the code under test proves
+       nothing.
+
+       V23b: they set seamSkipsCard first, so endMatch() resolves straight to
+       finish() instead of parking on the match card. A HEADLESS CALLER HAS NO
+       WAY TO TAP, so without this the seams would never reach done() and any
+       suite driving the accept -> play -> resolve chain would hang rather than
+       fail. The gate is the only thing skipped; everything else is the same
+       path a played-out LAN takes. */
+    __win: function () { if (!active) return false; seamSkipsCard = true; endMatch(true); return true; },
+    __fail: function () { if (!active) return false; seamSkipsCard = true; endMatch(false); return true; }
   };
 })(window.Game = window.Game || {});

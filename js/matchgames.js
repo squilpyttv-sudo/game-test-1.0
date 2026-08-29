@@ -422,6 +422,13 @@
         var farB = Math.round(cys - R * 0.05);    // far wall meets the paving
         var wallT = Math.round(cys - R * 0.36);   // top of the near stone wall
         var wallB = farB + Math.round(R * 0.26);  // ...and where it meets ground
+        /* The near stone corner he peeks from — declared up here because the
+           doorway below is sited off it too, and one number placed twice is
+           how the two would drift apart. Its INNER FACE is exactly the gap's
+           right edge; it never reaches into the gap. See the block that draws
+           it, further down, for why it exists at all. */
+        var pierW = Math.round(gapW * 0.92);
+        var pierX = gapX + gapW;
         var i, x, y, bl;
 
         // ---- sky, banded rather than graded so it stays flat pixel art ----
@@ -470,11 +477,16 @@
         px(c, balX, balY, balW, 9, '#B8A176');                // slab
         px(c, balX, balY, balW, 3, '#DCC79A');
 
-        /* ---- the doorway, and the corner of shade beside it. Placed OFF the
-           gap the scope holds — it starts a few pixels inside the gap's RIGHT
-           edge — so he steps out of the dark and INTO the reticle rather than
-           materialising on it. Derived from gapX/gapW like everything else. */
-        var dwX = gapX + Math.round(gapW / 2), dwW = gapW + 30;
+        /* ---- the doorway he came through, and the corner of shade beside it.
+           Sited entirely BEYOND the near corner (pierX + pierW), so no dark
+           opening ever crosses the slice the scope holds. An earlier pass put
+           it half on the gap, which was worse than useless here: he is an
+           almost-black backlit cut-out (AWP_T_BODY, #2A2621 at its lightest)
+           and this interior is #241D14, so any frame that walked him across it
+           would have hidden him in shade instead of merely popping him into
+           existence. Cover for this angle has to be SUNLIT — see the near
+           corner below. Still derived from gapX/gapW like everything else. */
+        var dwX = pierX + pierW + 4, dwW = gapW + 30;
         var dwT = Math.round(farB - R * 0.40);
         px(c, dwX - 7, dwT - 27, dwW + 14, farB - dwT + 27, '#A08A62');  // surround
         px(c, dwX - 7, dwT - 27, dwW + 14, 5, '#D6C094');                // lintel course
@@ -551,12 +563,62 @@
         px(c, brx + 3, wallB - 38, 28, 4, '#7E4722');
         px(c, brx + 3, wallB - 20, 28, 4, '#7E4722');
 
-        /* ---- him, walking RIGHT to LEFT out of the doorway. His path is the
-           exact mirror of mid doors' about the gap centre, so the two angles
-           are the same test in opposite directions rather than two different
-           ones. He stands on the scope's own centre line, which is what puts
-           his chest under the reticle on both angles. */
-        if (t >= 0) awpEnemy(c, gapX + gapW - 26 - (-14 + t * gapW), cys - 58, -1, AWP_T_BODY);
+        /* ---- THE NEAR CORNER — the cover, and the whole point of this block.
+
+           THE BUG IT KILLS: this angle used to draw its enemy with no clip and
+           nothing standing beside him, on open paving. A whole body switched on
+           mid-frame — the owner's "the enemy appears out of thin air". Mid doors
+           never had it, because its CT is drawn inside a clip and the door
+           reveal eats him; this is the mirror of that, and nothing else.
+
+           IT FRAMES THE GAP, IT DOES NOT SIT IN IT. Its inner face is exactly
+           gapX + gapW — the same convention mid doors uses for its right door
+           edge — so not one pixel of masonry lands on the slice the player is
+           holding, and the older lesson on this angle (anything that reaches
+           gapX is in the way of the game) still stands. What occludes him is
+           the STRUCTURE beside the gap; the OPENING is the gap itself.
+
+           RIGHT of the gap, because he travels right-to-left (peekDir -1). He
+           starts behind stone and walks out of it, so occlusion only ever
+           decreases: he is roughly a third visible at t=0 and completely in the
+           open well before the end of his travel.
+
+           SUNLIT, not a dark archway — see the doorway comment above. Drawn
+           here, after the paving and the steps, because it is nearer than both
+           and every one of them paints full width. */
+        var pierT = Math.round(farB - R * 0.52);
+        var pierB = wallB - 6;                                // stands on the top tread
+        px(c, pierX, pierT, pierW, pierB - pierT, '#C6B58D'); // the face
+        px(c, pierX, pierT, 3, pierB - pierT, '#F4E9CC');     // the lit arris he emerges past
+        px(c, pierX + 3, pierT, 3, pierB - pierT, '#DCC79A');
+        for (y = pierT + 14; y < pierB; y += 20)              // block courses
+          px(c, pierX, y, pierW, 3, '#A8926B');
+        px(c, pierX + pierW - 8, pierT, 8, pierB - pierT, '#8E7853');  // the shaded return
+        px(c, pierX, pierT - 9, pierW + 8, 9, '#E6D6B0');     // coping
+        px(c, pierX, pierT - 9, pierW + 8, 3, '#F4E9CC');
+        px(c, pierX, pierT, pierW + 8, 3, '#A08C68');         // and its shadow
+        // Sun comes from the left everywhere in this scene (lit caps up top,
+        // shaded right returns), so the corner throws its shadow to the RIGHT.
+        px(c, pierX + pierW, farB, 15, pierB - farB, '#A89A79');
+        px(c, pierX, pierB - 4, pierW + 15, 4, '#8A7C5E');    // where it meets the ground
+
+        /* ---- him, walking RIGHT to LEFT out from behind that corner. His path
+           and his timings are untouched: still the exact mirror of mid doors'
+           about the gap centre, still on the scope's own centre line so his
+           chest sits under the reticle on both angles. The ONLY change is the
+           clip, whose right edge is the corner's inner face — the direct
+           counterpart of mid doors' `c.rect(gapX, 0, gapW, doorBottom)`. Left
+           of it is deliberately open to the frame: clipping him on BOTH sides
+           would cut him again at the end of his travel, and he has to finish
+           completely clear for the peek to read as emerging from cover. */
+        if (t >= 0) {
+          c.save();
+          c.beginPath();
+          c.rect(0, 0, pierX, h);
+          c.clip();
+          awpEnemy(c, gapX + gapW - 26 - (-14 + t * gapW), cys - 58, -1, AWP_T_BODY);
+          c.restore();
+        }
       }
     }
   ];
@@ -2055,6 +2117,17 @@
        rather than regexing one hard-coded route out of the source, so adding a
        third map is covered the moment it is added. */
     __maps: function () { return BH_MAPS; },
+
+    /* Test seam: the AWP angle table plus the two helpers every angle is
+       composed against. Same reasoning as __maps — the thing worth asserting
+       about an angle is that its enemy is actually OCCLUDED at the start of
+       his peek, and that can only be measured by rendering the angle into a
+       recording context, never by regexing the source. A third angle is
+       covered the day it is added. */
+    __awp: function () {
+      return { angles: AWP_ANGLES, scene: awpScene, enemy: awpEnemy };
+    },
+
     __win: win,
     __fail: fail
   };
