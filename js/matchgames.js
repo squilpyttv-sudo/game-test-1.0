@@ -95,13 +95,22 @@
     canvas.addEventListener('pointercancel', function () { if (game && game.up) game.up(null); });
   }
 
+  /* W and H are CSS PIXELS, never the backing store's device pixels — see
+     sizeCanvas(). This must read W, not canvas.width: since V23d those two
+     differ by the device pixel ratio, and multiplying a CSS pointer offset by
+     a device-pixel width would land every tap at DPR times the right place. */
   function pt(e) {
     var r = canvas.getBoundingClientRect();
     return {
-      x: (e.clientX - r.left) * (canvas.width / r.width),
-      y: (e.clientY - r.top) * (canvas.height / r.height)
+      x: (e.clientX - r.left) * (W / r.width),
+      y: (e.clientY - r.top) * (H / r.height)
     };
   }
+
+  /* Cap the buffer at 3x. A 4x store on a 420x860 element is 4.3 million
+     pixels refilled every frame on exactly the phones least able to afford
+     it, and no display resolves the difference. */
+  var MAX_DPR = 3;
 
   function sizeCanvas() {
     // The CANVAS's own box, not the overlay's: the canvas sits under the timer
@@ -109,11 +118,29 @@
     // the overlay gave the backing store more rows than the element displays,
     // and the browser then squashed every frame vertically to fit.
     var r = canvas.getBoundingClientRect();
-    // Backing store at CSS size: this art is chunky flat rectangles, so a
-    // DPR-scaled buffer buys nothing but fill cost on a phone.
-    canvas.width = Math.max(1, Math.round(r.width));
-    canvas.height = Math.max(1, Math.round(r.height));
-    W = canvas.width; H = canvas.height;
+    /* V23d: the backing store is DEVICE pixels; everything else stays CSS
+       pixels. This used to size the buffer at CSS size, reasoning that chunky
+       flat rectangles gain nothing from a DPR-scaled buffer. True of the
+       rectangles — and wrong about the TEXT, which is vector, not chunky. On a
+       DPR>1 phone the browser upscaled a 1x buffer, and imageSmoothingEnabled
+       being false made that a nearest-neighbour blow-up, so every label in
+       here (the map card, the bhop callouts, the intro hint) came out
+       pixelated. The owner reported exactly that on the CLUTCH's briefing,
+       which carried the identical bug.
+       setTransform, not scale(): this runs again on every resize, and scale()
+       would compound. Because the transform absorbs the ratio, not one draw
+       call below had to change — they all still speak CSS pixels. */
+    var cssW = Math.max(1, Math.round(r.width));
+    var cssH = Math.max(1, Math.round(r.height));
+    var dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, MAX_DPR));
+    canvas.width = Math.max(1, Math.round(cssW * dpr));
+    canvas.height = Math.max(1, Math.round(cssH * dpr));
+    W = cssW; H = cssH;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    /* Stays false, and it is NOT what made the text pixelated: this governs
+       drawImage and pattern scaling, never fillText. The pixel-art register of
+       the props is deliberate; the text is sharp now because the buffer is
+       native, not because anything here got smoothed. */
     ctx.imageSmoothingEnabled = false;
   }
 
